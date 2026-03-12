@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { ConcentricRings } from "@/components/ConcentricRings";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
-import { ChevronLeft, ChevronRight, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Filter, List, ListOrdered, CheckSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw } from "lucide-react";
 
 type TagItem = { id: string; name: string; color: string; };
-type MasterTask = { id: string; text: string; is_priority: boolean; tag_id?: string; due_date?: string; time?: string; notes?: string; };
-type TaskItem = { id: string; master_id: string; text: string; is_done: boolean; is_priority: boolean; tag_id?: string; due_date?: string; time?: string; notes?: string; };
+type MasterTask = { id: string; text: string; is_priority: boolean; tag_id?: string; due_date?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; };
+type TaskItem = { id: string; master_id: string; text: string; is_done: boolean; is_priority: boolean; tag_id?: string; due_date?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; };
+type DeletedTask = MasterTask & { deletedAt: string; };
 
 type MealType = "B" | "L" | "D" | "S";
 type MealEntry = { id: string; type: MealType; text: string; };
@@ -30,6 +31,55 @@ const getDateKey = (date: Date) => {
 };
 
 const getEmptyDay = (): DayTasks => ({ items: [], meals: [], water: 0, steps: "", step_goal: "10000", notes: "" });
+
+// Returns true if the task has a time, is on today, and that time has passed
+const isOverdue = (taskTime: string | undefined, dateKey: string): boolean => {
+  if (!taskTime) return false;
+  const todayKey = getDateKey(new Date());
+  if (dateKey !== todayKey) return false;
+  const [hours, minutes] = taskTime.split(":").map(Number);
+  const now = new Date();
+  return now.getHours() > hours || (now.getHours() === hours && now.getMinutes() > minutes);
+};
+
+// Returns true if the task time is within 20 minutes from now (but not yet passed)
+const isApproaching = (taskTime: string | undefined, dateKey: string): boolean => {
+  if (!taskTime) return false;
+  const todayKey = getDateKey(new Date());
+  if (dateKey !== todayKey) return false;
+  const [hours, minutes] = taskTime.split(":").map(Number);
+  const now = new Date();
+  const taskMinutes = hours * 60 + minutes;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return taskMinutes > nowMinutes && taskMinutes - nowMinutes <= 20;
+};
+
+// ─── Nudge helpers (for Task Bank — uses reminderTime, not tied to a day) ────
+
+// Parse a reminderTime string like "2025-06-14T15:30" or "2025-06-14" into a Date
+const parseReminderTime = (rt: string): Date | null => {
+  const d = new Date(rt);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+// True if reminder is within 24 hours but not yet past
+const isNudgeApproaching = (task: MasterTask): boolean => {
+  if (!task.isReminderActive || !task.reminderTime) return false;
+  const target = parseReminderTime(task.reminderTime);
+  if (!target) return false;
+  const now = new Date();
+  const diff = target.getTime() - now.getTime();
+  return diff > 0 && diff <= 24 * 60 * 60 * 1000;
+};
+
+// True if reminder time has passed and task hasn't been scheduled
+const isNudgeOverdue = (task: MasterTask): boolean => {
+  if (!task.isReminderActive || !task.reminderTime) return false;
+  const target = parseReminderTime(task.reminderTime);
+  if (!target) return false;
+  return target.getTime() < new Date().getTime();
+};
+// ──────────────────────────────────────────────────────────────────────────────
 
 // Aesthetic Color Palette
 const aestheticColors = [
@@ -54,7 +104,7 @@ const defaultTags: TagItem[] = [
 
 
 // ─── Notes keyboard helpers ────────────────────────────────────────────────────
-const NUMBER_LINE_RE = /^(\d+)\.\s/;
+const NUMBER_LINE_RE = /^(\s*)(\d+)\.\s/;  // matches "1. " at any indent level
 const LETTER_LINE_RE = /^\s*([a-z])\.\s/;
 const letterToIndex = (ch: string) => ch.charCodeAt(0) - 97;
 const indexToLetter = (i: number) => String.fromCharCode(97 + (i % 26));
@@ -63,7 +113,7 @@ function nextNumberAbove(lines: string[]): number {
   let last = 0;
   for (const l of lines) {
     const m = l.match(NUMBER_LINE_RE);
-    if (m) last = parseInt(m[1], 10);
+    if (m) last = parseInt(m[2], 10);
   }
   return last + 1;
 }
@@ -80,6 +130,16 @@ function nextLetterAbove(lines: string[]): string {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => setHasMounted(true), []);
+
+  // Re-render every minute so overdue/approaching colors update without a refresh
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const dateKey = getDateKey(currentDate);
 
@@ -91,8 +151,15 @@ export default function Home() {
     } catch { return []; }
   });
   const [isBankOpen, setIsBankOpen] = useState(false);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
   const [bankFilterTagId, setBankFilterTagId] = useState<string>("ALL");
+  const [deletedTasks, setDeletedTasks] = useState<DeletedTask[]>(() => {
+    try {
+      const saved = localStorage.getItem('stride-deleted-tasks');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
   const [mealMemory, setMealMemory] = useState<string[]>(["Chicken Stir Fry", "Oatmeal with Berries", "Turkey Sandwich", "Protein Shake", "Salmon and Rice"]);
   const [activeMealInput, setActiveMealInput] = useState<MealType | null>(null);
@@ -106,7 +173,12 @@ export default function Home() {
   const [newTaskTime, setNewTaskTime] = useState("");
   const [newTaskNotes, setNewTaskNotes] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState(false);
+  const [newTaskReminderTime, setNewTaskReminderTime] = useState("");
+  const [newTaskReminderActive, setNewTaskReminderActive] = useState(false);
 
+  const [waterJustCompleted, setWaterJustCompleted] = useState(false);
+  const [archivedFlashId, setArchivedFlashId] = useState<string | null>(null);
+  const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [newTagName, setNewTagName] = useState("");
@@ -148,14 +220,73 @@ export default function Home() {
   useEffect(() => {
     try { localStorage.setItem('stride-task-bank', JSON.stringify(taskBank)); } catch {}
   }, [taskBank]);
+
+  useEffect(() => {
+    try { localStorage.setItem('stride-deleted-tasks', JSON.stringify(deletedTasks)); } catch {}
+  }, [deletedTasks]);
+
+  // ─── 7-day cleanup: permanently remove soft-deleted tasks older than 7 days ──
+  useEffect(() => {
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    setDeletedTasks(prev => prev.filter(t => Date.now() - new Date(t.deletedAt).getTime() < SEVEN_DAYS_MS));
+  }, []); // runs once on mount
   // ──────────────────────────────────────────────────────────────────────────
 
   const toggleDayTaskDone = (id: string) => {
+    const existingDay = getDayData(dateKey);
+    const task = existingDay.items.find(t => t.id === id);
+    const willBecomeDone = task ? !task.is_done : false;
+
     setDataStore((prevStore) => {
-      const existingDay = getDayData(dateKey);
-      const newItems = existingDay.items.map(t => t.id === id ? { ...t, is_done: !t.is_done } : t);
-      return { ...prevStore, [dateKey]: { ...existingDay, items: newItems } };
+      const day = prevStore[dateKey] || getEmptyDay();
+      const newItems = day.items.map(t => t.id === id ? { ...t, is_done: !t.is_done } : t);
+      return { ...prevStore, [dateKey]: { ...day, items: newItems } };
     });
+
+    if (task && willBecomeDone && taskBank.some(t => t.id === task.master_id)) {
+      if (task.due_date === dateKey) {
+        // Exact due date match — archive immediately, no confirmation
+        setArchivedFlashId(task.id);
+        setTimeout(() => setArchivedFlashId(null), 800);
+        setTimeout(() => archiveMasterTask(task.master_id), 300);
+      } else {
+        // Early or manual completion — ask first
+        setArchiveConfirmId(task.id);
+      }
+    }
+  };
+
+  // Called by the daily PackageCheck button
+  const smartArchiveFromDay = (task: TaskItem) => {
+    if (task.due_date === dateKey) {
+      // On the due date — mark done and archive immediately
+      setDataStore((prevStore) => {
+        const day = prevStore[dateKey] || getEmptyDay();
+        return { ...prevStore, [dateKey]: { ...day, items: day.items.map(t => t.id === task.id ? { ...t, is_done: true } : t) } };
+      });
+      setArchivedFlashId(task.id);
+      setTimeout(() => setArchivedFlashId(null), 800);
+      setTimeout(() => archiveMasterTask(task.master_id), 300);
+    } else {
+      // Off due-date — mark done on this day, then ask
+      setDataStore((prevStore) => {
+        const day = prevStore[dateKey] || getEmptyDay();
+        return { ...prevStore, [dateKey]: { ...day, items: day.items.map(t => t.id === task.id ? { ...t, is_done: true } : t) } };
+      });
+      setArchiveConfirmId(task.id);
+    }
+  };
+
+  const confirmArchive = (task: TaskItem) => {
+    setArchiveConfirmId(null);
+    setArchivedFlashId(task.id);
+    setTimeout(() => setArchivedFlashId(null), 800);
+    setTimeout(() => archiveMasterTask(task.master_id), 200);
+  };
+
+  const declineArchive = () => {
+    setArchiveConfirmId(null);
+    // Task stays done on this day only — no bank change
   };
 
   const toggleDayTaskPriority = (id: string) => {
@@ -178,6 +309,36 @@ export default function Home() {
     setDataStore((prevStore) => {
       const existingDay = getDayData(dateKey);
       const newWater = existingDay.water === index + 1 ? index : index + 1;
+
+      // Trigger celebration only when hitting exactly 8
+      if (newWater === 8) {
+        // Play a soft water drop sound via Web Audio API
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const playDrop = (time: number, freq: number, gain: number) => {
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, time);
+            osc.frequency.exponentialRampToValueAtTime(freq * 0.4, time + 0.3);
+            gainNode.gain.setValueAtTime(0, time);
+            gainNode.gain.linearRampToValueAtTime(gain, time + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+            osc.start(time);
+            osc.stop(time + 0.35);
+          };
+          const now = ctx.currentTime;
+          playDrop(now,        880, 0.08);
+          playDrop(now + 0.1,  1100, 0.06);
+          playDrop(now + 0.18, 1320, 0.05);
+        } catch {}
+
+        setWaterJustCompleted(true);
+        setTimeout(() => setWaterJustCompleted(false), 2000);
+      }
+
       return { ...prevStore, [dateKey]: { ...existingDay, water: newWater } };
     });
   };
@@ -214,20 +375,71 @@ export default function Home() {
     const currentLine = value.slice(lineStart, lineEnd);
     const linesAbove = value.slice(0, lineStart).split("\n").filter(Boolean);
 
-    // ── Tab: number → indented letter ─────────────────────────────────────────
+    const BULLET_RE = /^(\s*)(•|◦|-)\s/;  // matches any bullet style at any indent
+    const SUB_BULLET_RE = /^(\s+)(•|◦|-)\s/; // indented bullet of any style
+
+    // Returns the correct prefix char based on indent level (0-based)
+    // Numbers: even levels = number, odd levels = letter
+    // Bullets:  even levels = •,      odd levels = ◦
+    const INDENT = "   "; // 3 spaces per level
+
+    const getNumberPrefix = (indent: string, linesAbove: string[]): string => {
+      const level = Math.round(indent.length / INDENT.length);
+      if (level % 2 === 0) {
+        // number level — find next number at this indent
+        let last = 0;
+        for (const l of linesAbove) {
+          const m = l.match(/^(\s*)(\d+)\.\s/);
+          if (m && m[1].length === indent.length) last = parseInt(m[2], 10);
+          // reset when we hit a shallower indent
+          if (m && m[1].length < indent.length) last = 0;
+        }
+        return `${indent}${last + 1}. `;
+      } else {
+        // letter level
+        let last = -1;
+        for (const l of linesAbove) {
+          const m = l.match(/^(\s*)([a-z])\.\s/);
+          if (m && m[1].length === indent.length) last = letterToIndex(m[2]);
+          if (m && m[1].length < indent.length) last = -1;
+        }
+        return `${indent}${indexToLetter(last + 1)}. `;
+      }
+    };
+
+    const getBulletChar = (indent: string): string => {
+      const level = Math.round(indent.length / INDENT.length);
+      return level % 2 === 0 ? "•" : "◦";
+    };
+
+    // ── Tab ───────────────────────────────────────────────────────────────────
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
-      if (NUMBER_LINE_RE.test(currentLine)) {
-        const nextLetter = nextLetterAbove(linesAbove);
-        // Strip leading spaces from currentLine before replacing, then re-indent
-        const stripped = currentLine.replace(/^\s*/, "");
-        const newLine = "   " + stripped.replace(NUMBER_LINE_RE, `${nextLetter}. `);
+
+      const numMatch = currentLine.match(/^(\s*)(\d+|[a-z])\.\s/);
+      const bulMatch = currentLine.match(BULLET_RE);
+
+      if (numMatch) {
+        const newIndent = numMatch[1] + INDENT;
+        const rest = currentLine.slice(numMatch[0].length);
+        const newPrefix = getNumberPrefix(newIndent, linesAbove);
+        const newLine = newPrefix + rest;
         const newText = value.slice(0, lineStart) + newLine + value.slice(lineEnd);
         setDayNotes(newText);
         const delta = newLine.length - currentLine.length;
         requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = selectionStart + delta; });
+
+      } else if (bulMatch) {
+        const newIndent = bulMatch[1] + INDENT;
+        const rest = currentLine.slice(bulMatch[0].length);
+        const newLine = `${newIndent}${getBulletChar(newIndent)} ${rest}`;
+        const newText = value.slice(0, lineStart) + newLine + value.slice(lineEnd);
+        setDayNotes(newText);
+        const delta = newLine.length - currentLine.length;
+        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = selectionStart + delta; });
+
       } else {
-        // fallback: insert 2 spaces for non-list lines
+        // fallback: 2 spaces
         const newText = value.slice(0, selectionStart) + "  " + value.slice(selectionEnd);
         setDayNotes(newText);
         requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = selectionStart + 2; });
@@ -235,17 +447,27 @@ export default function Home() {
       return;
     }
 
-    // ── Shift+Tab: indented letter → outdent back to number ───────────────────
+    // ── Shift+Tab ─────────────────────────────────────────────────────────────
     if (e.key === "Tab" && e.shiftKey) {
       e.preventDefault();
-      // Match letter lines with optional leading spaces
-      const indentedLetterRE = /^(\s*)([a-z])\.\s/;
-      const m = currentLine.match(indentedLetterRE);
-      if (m) {
-        const nextNum = nextNumberAbove(linesAbove);
-        // Remove indent, replace letter prefix with number prefix
-        const rest = currentLine.slice(m[0].length);
-        const newLine = `${nextNum}. ${rest}`;
+
+      const numMatch = currentLine.match(/^(\s+)(\d+|[a-z])\.\s/); // must have indent
+      const bulMatch = currentLine.match(SUB_BULLET_RE);            // must have indent
+
+      if (numMatch) {
+        const newIndent = numMatch[1].slice(INDENT.length); // remove one level
+        const rest = currentLine.slice(numMatch[0].length);
+        const newPrefix = getNumberPrefix(newIndent, linesAbove);
+        const newLine = newPrefix + rest;
+        const newText = value.slice(0, lineStart) + newLine + value.slice(lineEnd);
+        setDayNotes(newText);
+        const delta = newLine.length - currentLine.length;
+        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = selectionStart + delta; });
+
+      } else if (bulMatch) {
+        const newIndent = bulMatch[1].slice(INDENT.length);
+        const rest = currentLine.slice(bulMatch[0].length);
+        const newLine = `${newIndent}${getBulletChar(newIndent)} ${rest}`;
         const newText = value.slice(0, lineStart) + newLine + value.slice(lineEnd);
         setDayNotes(newText);
         const delta = newLine.length - currentLine.length;
@@ -254,18 +476,25 @@ export default function Home() {
       return;
     }
 
-    // ── Enter: auto-increment number or letter ─────────────────────────────────
+    // ── Enter ─────────────────────────────────────────────────────────────────
     if (e.key === "Enter") {
       const isNumber = NUMBER_LINE_RE.test(currentLine);
       const isLetter = LETTER_LINE_RE.test(currentLine);
-      if (!isNumber && !isLetter) return;
+      const isBullet = BULLET_RE.test(currentLine);
+
+      if (!isNumber && !isLetter && !isBullet) return;
 
       e.preventDefault();
-      const textAfterPrefix = currentLine.replace(isNumber ? NUMBER_LINE_RE : LETTER_LINE_RE, "").trim();
 
-      // If line is empty prefix only → remove formatting and do normal newline
-      if (textAfterPrefix === "") {
-        const prefixLen = currentLine.length;
+      // Strip prefix to check if line is empty
+      const stripped = currentLine
+        .replace(NUMBER_LINE_RE, "")
+        .replace(LETTER_LINE_RE, "")
+        .replace(BULLET_RE, "")
+        .trim();
+
+      // Empty prefix line → remove formatting, plain newline
+      if (stripped === "") {
         const newText = value.slice(0, lineStart) + value.slice(lineEnd);
         setDayNotes(newText);
         requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = lineStart; });
@@ -274,12 +503,16 @@ export default function Home() {
 
       let nextPrefix = "";
       if (isNumber) {
-        const m = currentLine.match(NUMBER_LINE_RE)!;
-        nextPrefix = `${parseInt(m[1], 10) + 1}. `;
-      } else {
+        const m = currentLine.match(/^(\s*)(\d+)\.\s/)!;
+        const indent = m[1];
+        nextPrefix = getNumberPrefix(indent, [...linesAbove, currentLine]);
+      } else if (isLetter) {
         const m = currentLine.match(/^(\s*)([a-z])\.\s/)!;
-        const indent = m[1]; // preserve leading spaces
-        nextPrefix = `${indent}${indexToLetter(letterToIndex(m[2]) + 1)}. `;
+        const indent = m[1];
+        nextPrefix = getNumberPrefix(indent, [...linesAbove, currentLine]);
+      } else if (isBullet) {
+        const m = currentLine.match(BULLET_RE)!;
+        nextPrefix = `${m[1]}${m[2]} `;
       }
 
       const insertion = "\n" + nextPrefix;
@@ -343,7 +576,7 @@ export default function Home() {
     let finalTagId = newTaskTagId;
     if (isCreatingTag && newTagName.trim()) finalTagId = handleAddTag() || "";
     const newMasterId = `m_${Date.now()}`;
-    const newMasterTask: MasterTask = { id: newMasterId, text: newTaskText.trim(), is_priority: newTaskPriority, tag_id: finalTagId || undefined, due_date: newTaskDate, time: newTaskTime, notes: newTaskNotes };
+    const newMasterTask: MasterTask = { id: newMasterId, text: newTaskText.trim(), is_priority: newTaskPriority, tag_id: finalTagId || undefined, due_date: newTaskDate, time: newTaskTime, notes: newTaskNotes, reminderTime: newTaskReminderTime || undefined, isReminderActive: newTaskReminderActive };
     setTaskBank((prev) => [...prev, newMasterTask]);
     scheduleTaskToDay(newMasterTask, newTaskDate || dateKey);
     setIsModalOpen(false);
@@ -353,6 +586,7 @@ export default function Home() {
   const resetModal = () => {
     setNewTaskText(""); setNewTaskTagId(""); setNewTaskDate(dateKey);
     setNewTaskTime(""); setNewTaskNotes(""); setNewTaskPriority(false);
+    setNewTaskReminderTime(""); setNewTaskReminderActive(false);
     setIsCreatingTag(false); setIsPaletteOpen(false);
   };
 
@@ -366,16 +600,34 @@ export default function Home() {
   };
 
   const archiveMasterTask = (masterId: string) => {
+    const masterTask = taskBank.find(t => t.id === masterId);
+    // Soft-delete: move to deletedTasks with timestamp instead of permanent removal
+    if (masterTask) {
+      setDeletedTasks(prev => [...prev, { ...masterTask, deletedAt: new Date().toISOString() }]);
+    }
     setTaskBank((prev) => prev.filter((t) => t.id !== masterId));
     setDataStore((prevStore) => {
       const newStore = { ...prevStore };
       Object.keys(newStore).forEach(date => {
         const day = newStore[date];
-        newStore[date] = { ...day, items: day.items.map(item => item.master_id === masterId ? { ...item, is_done: true } : item) };
+        const hasTask = day.items.some(item => item.master_id === masterId);
+        if (hasTask) {
+          newStore[date] = { ...day, items: day.items.map(item => item.master_id === masterId ? { ...item, is_done: true } : item) };
+        }
       });
+      if (masterTask?.due_date && newStore[masterTask.due_date]) {
+        const dueDay = newStore[masterTask.due_date];
+        newStore[masterTask.due_date] = { ...dueDay, items: dueDay.items.map(item => item.master_id === masterId ? { ...item, is_done: true } : item) };
+      }
       return newStore;
     });
-    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#000080', '#9C9F84', '#d97706', '#7c3aed'] });
+    confetti({ particleCount: 120, spread: 60, origin: { y: 0.6 }, colors: ['#000080', '#9C9F84', '#22c55e', '#d97706'] });
+  };
+
+  const restoreDeletedTask = (deletedTask: DeletedTask) => {
+    const { deletedAt, ...masterTask } = deletedTask;
+    setTaskBank(prev => [...prev, masterTask]);
+    setDeletedTasks(prev => prev.filter(t => t.id !== deletedTask.id));
   };
 
   const shiftDate = (days: number) => {
@@ -472,6 +724,7 @@ export default function Home() {
   });
 
   const tasksCompleted = tasksArray.filter((t) => t.is_done).length;
+  const anyNudge = taskBank.some(t => isNudgeApproaching(t) || isNudgeOverdue(t));
   const prioritiesCompleted = prioritiesArray.filter((p) => p.is_done).length;
   const goalsCompleted = goalsArray.filter((g) => g.is_done).length;
   const formattedDate = currentDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -550,6 +803,8 @@ export default function Home() {
     );
   };
 
+  if (!hasMounted) return null;
+
   return (
     <div className="flex min-h-screen justify-center bg-zinc-100 font-sans dark:bg-black p-4 sm:p-8 relative overflow-y-auto">
 
@@ -589,26 +844,108 @@ export default function Home() {
                     <span className="text-xs font-semibold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md ml-auto">{items.length}</span>
                   </div>
                   <div className="flex flex-col gap-3">
-                    {items.map(task => (
-                      <div key={task.id} className="group relative flex flex-col gap-3 p-4 bg-white border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl hover:border-brand-navy/50 hover:shadow-md transition-all">
-                        <div className="flex items-start gap-3">
-                          <Star className={cn("w-5 h-5 mt-0.5 shrink-0 transition-colors", task.is_priority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
-                          <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">{task.text}</span>
+                    {items.map(task => {
+                      const nudgeApproaching = isNudgeApproaching(task);
+                      const nudgeOverdue = isNudgeOverdue(task);
+                      const hasNudge = nudgeApproaching || nudgeOverdue;
+                      return (
+                        <div key={task.id} className={cn(
+                          "group relative flex flex-col gap-3 p-4 bg-white border dark:bg-zinc-900/50 rounded-xl hover:shadow-md transition-all",
+                          nudgeOverdue
+                            ? "border-amber-300 dark:border-amber-700 shadow-[0_0_12px_2px_rgba(251,191,36,0.2)] animate-pulse-opacity"
+                            : nudgeApproaching
+                            ? "border-amber-200 dark:border-amber-800 shadow-[0_0_8px_1px_rgba(251,191,36,0.15)]"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-brand-navy/50"
+                        )}>
+                          <div className="flex items-start gap-3">
+                            <Star className={cn("w-5 h-5 mt-0.5 shrink-0 transition-colors", task.is_priority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">{task.text}</span>
+                              {task.isReminderActive && task.reminderTime && (
+                                <span className={cn(
+                                  "flex items-center gap-1 text-[11px] font-medium font-mono",
+                                  nudgeOverdue ? "text-amber-500" : nudgeApproaching ? "text-amber-400" : "text-zinc-400"
+                                )}>
+                                  <Bell className="w-3 h-3" />
+                                  {new Date(task.reminderTime).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              )}
+                            </div>
+                            {hasNudge && (
+                              <Bell className={cn("w-4 h-4 shrink-0 mt-0.5", nudgeOverdue ? "text-amber-500 fill-amber-400" : "text-amber-400")} />
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                            {hasNudge ? (
+                              <button onClick={() => scheduleTaskToDay(task, dateKey)} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white hover:bg-amber-600 text-xs font-bold rounded-md transition-colors shadow-sm">
+                                <ArrowRightToLine className="w-3.5 h-3.5" /> Quick Add Today
+                              </button>
+                            ) : (
+                              <button onClick={() => scheduleTaskToDay(task, dateKey)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/20 dark:text-brand-navy hover:bg-brand-navy hover:text-white text-xs font-bold rounded-md transition-colors shadow-sm">
+                                <ArrowRightToLine className="w-3.5 h-3.5" /> Plan for {new Date(dateKey + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' })}
+                              </button>
+                            )}
+                            <button onClick={() => archiveMasterTask(task.id)} className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold rounded-md transition-colors">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Archive
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                          <button onClick={() => scheduleTaskToDay(task, dateKey)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/20 dark:text-brand-navy hover:bg-brand-navy hover:text-white text-xs font-bold rounded-md transition-colors shadow-sm">
-                            <ArrowRightToLine className="w-3.5 h-3.5" /> Plan for {new Date(dateKey + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' })}
-                          </button>
-                          <button onClick={() => archiveMasterTask(task.id)} className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold rounded-md transition-colors">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Archive
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
             })
+          )}
+        </div>
+
+        {/* ── Soft-Delete Trash Footer ── */}
+        <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => setIsTrashOpen(o => !o)}
+            className={cn(
+              "w-full flex items-center gap-2 px-5 py-3 text-xs font-semibold transition-colors",
+              isTrashOpen
+                ? "bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300"
+                : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            )}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Recently Archived
+            {deletedTasks.length > 0 && (
+              <span className="ml-auto bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded-full">{deletedTasks.length}</span>
+            )}
+            <span className={cn("ml-auto text-[10px] text-zinc-400 transition-transform duration-200", isTrashOpen ? "rotate-180" : "", deletedTasks.length > 0 ? "" : "ml-auto")}>▼</span>
+          </button>
+
+          {isTrashOpen && (
+            <div className="max-h-64 overflow-y-auto flex flex-col gap-2 p-4 bg-zinc-50 dark:bg-zinc-900/50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              {deletedTasks.length === 0 ? (
+                <p className="text-xs text-zinc-400 text-center py-4 italic">No recently archived tasks.</p>
+              ) : (
+                deletedTasks.slice().reverse().map(task => {
+                  const daysAgo = Math.floor((Date.now() - new Date(task.deletedAt).getTime()) / (1000 * 60 * 60 * 24));
+                  const expiresIn = 7 - daysAgo;
+                  return (
+                    <div key={task.id} className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg group">
+                      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400 truncate line-through">{task.text}</span>
+                        <span className="text-[10px] text-zinc-400 font-mono">
+                          {expiresIn <= 1 ? "Expires today" : `${expiresIn}d left`}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => restoreDeletedTask(task)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-brand-sage bg-brand-sage/10 hover:bg-brand-sage/20 rounded-md transition-colors shrink-0"
+                        title="Restore to Bank"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Restore
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -671,6 +1008,35 @@ export default function Home() {
                   <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
                   <input type="time" value={newTaskTime || ""} onChange={e => setNewTaskTime(e.target.value)} className="bg-transparent border-none text-sm outline-none w-full text-zinc-800 dark:text-zinc-200" />
                 </div>
+                {/* Bell — Deadline Nudge (no due_date required) */}
+                <div className={cn(
+                  "flex items-center gap-2 border rounded-lg px-3 py-2 col-span-2 transition-all",
+                  newTaskReminderActive
+                    ? "bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 ring-2 ring-amber-200/50"
+                    : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus-within:ring-2 ring-brand-navy/20"
+                )}>
+                  <button
+                    type="button"
+                    onClick={() => setNewTaskReminderActive(a => !a)}
+                    title="Set Deadline Nudge"
+                    className="shrink-0"
+                  >
+                    <Bell className={cn("w-4 h-4 transition-colors", newTaskReminderActive ? "text-amber-500 fill-amber-400" : "text-zinc-400")} />
+                  </button>
+                  {newTaskReminderActive ? (
+                    <input
+                      type="datetime-local"
+                      value={newTaskReminderTime || ""}
+                      onChange={e => setNewTaskReminderTime(e.target.value)}
+                      className="bg-transparent border-none text-sm outline-none w-full text-zinc-800 dark:text-zinc-200"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="text-sm text-zinc-400 cursor-pointer" onClick={() => setNewTaskReminderActive(true)}>
+                      Add deadline nudge…
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-start gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-3 focus-within:ring-2 ring-brand-navy/20">
                 <AlignLeft className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
@@ -703,9 +1069,14 @@ export default function Home() {
             <span className="text-lg font-bold text-zinc-800 dark:text-zinc-200 select-none min-w-[220px] text-center">{formattedDate}</span>
             <button onClick={() => shiftDate(1)} className="p-2 text-zinc-500 hover:text-brand-navy hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"><ChevronRight className="w-5 h-5" /></button>
           </div>
-          <button onClick={() => setIsBankOpen(true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-sage bg-brand-sage/10 hover:bg-brand-sage/20 rounded-full transition-colors">
+          <button onClick={() => setIsBankOpen(true)} className="relative flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-sage bg-brand-sage/10 hover:bg-brand-sage/20 rounded-full transition-colors">
             <Library className="w-4 h-4" /> Task Bank
             <span className="bg-brand-sage text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{taskBank.length}</span>
+            {anyNudge && (
+              <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-amber-400 rounded-full animate-pulse-opacity">
+                <Bell className="w-2.5 h-2.5 text-white" />
+              </span>
+            )}
           </button>
         </div>
 
@@ -738,22 +1109,45 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-4 flex-1">
               {tasksArray.map((task) => (
-                <div key={task.id} className="flex items-start gap-3 group border-b border-zinc-100 dark:border-zinc-800/50 pb-3 isolate">
+                <div key={task.id} className={cn(
+                  "flex items-start gap-3 group border-b border-zinc-100 dark:border-zinc-800/50 pb-3 isolate rounded-md transition-all duration-300",
+                  archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
+                )}>
                   <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                     <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
                     <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
-                  <div className="flex-1 flex flex-col">
+                  <div className="flex-1 flex flex-col min-w-0">
                     <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => toggleDayTaskDone(task.id)}>{task.text}</span>
                     {task.time && (
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 mt-0.5 font-mono">
+                      <span className={cn(
+                        "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
+                        !task.is_done && isOverdue(task.time, dateKey)
+                          ? "text-red-400 animate-pulse-opacity"
+                          : !task.is_done && isApproaching(task.time, dateKey)
+                          ? "text-amber-400 animate-pulse-opacity"
+                          : "text-zinc-400"
+                      )}>
                         <Clock className="w-3 h-3" />{task.time}
                       </span>
+                    )}
+                    {/* Confirmation tooltip — early/manual archive prompt */}
+                    {archiveConfirmId === task.id && (
+                      <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
+                        <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
+                        <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                      </div>
                     )}
                   </div>
                   {renderTagDot(task.tag_id)}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
+                    {taskBank.some(t => t.id === task.master_id) && (
+                      <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
+                        <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
+                      </button>
+                    )}
                     <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                   </div>
                 </div>
@@ -786,19 +1180,41 @@ export default function Home() {
               </h2>
               <div className="flex flex-col gap-0">
                 {prioritiesArray.map((task, idx) => (
-                  <div key={task.id} className="flex items-center gap-3 group border-b border-zinc-200 dark:border-zinc-800 py-3 isolate">
+                  <div key={task.id} className={cn(
+                    "flex items-center gap-3 group border-b border-zinc-200 dark:border-zinc-800 py-3 isolate rounded-md transition-all duration-300",
+                    archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
+                  )}>
                     <span className="font-mono text-lg font-bold text-brand-sage/60 w-6 shrink-0 text-center">{idx + 1}</span>
-                    <div className="flex-1 flex flex-col cursor-pointer overflow-hidden" onClick={() => toggleDayTaskDone(task.id)}>
-                      <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight truncate", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")}>{task.text}</span>
+                    <div className="flex-1 flex flex-col cursor-pointer overflow-hidden min-w-0">
+                      <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight truncate", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => toggleDayTaskDone(task.id)}>{task.text}</span>
                       {task.time && (
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 mt-0.5 font-mono">
+                        <span className={cn(
+                          "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
+                          !task.is_done && isOverdue(task.time, dateKey)
+                            ? "text-red-400 animate-pulse-opacity"
+                            : !task.is_done && isApproaching(task.time, dateKey)
+                            ? "text-amber-400 animate-pulse-opacity"
+                            : "text-zinc-400"
+                        )}>
                           <Clock className="w-3 h-3" />{task.time}
                         </span>
+                      )}
+                      {archiveConfirmId === task.id && (
+                        <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
+                          <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
+                          <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                        </div>
                       )}
                     </div>
                     {renderTagDot(task.tag_id)}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Remove Priority"><Star className="w-4 h-4 text-brand-sage fill-brand-sage" /></button>
+                      {taskBank.some(t => t.id === task.master_id) && (
+                        <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
+                          <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
+                        </button>
+                      )}
                       <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                     </div>
                     <div className="relative flex items-center justify-center shrink-0 ml-2">
@@ -850,23 +1266,27 @@ export default function Home() {
 
                 {/* ── Water Tracker ── */}
                 <div className="flex items-center gap-4 group">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 shrink-0">
+                  <div className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all duration-500",
+                    waterGoalMet
+                      ? "bg-[#9C9F84]/20 text-[#9C9F84]"
+                      : "bg-blue-50 dark:bg-blue-900/30 text-blue-500"
+                  )}>
                     <Droplets className="w-4 h-4" />
                   </div>
                   <div className="flex-1 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Water</span>
-                      {/* ── HYDRATED BADGE: shows when all 8 droplets are filled ── */}
                       {waterGoalMet && (
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-[#475569] uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-300 dark:border-slate-600 animate-in fade-in zoom-in duration-300">
-                          <CheckCircle2 className="w-3 h-3 text-[#475569]" /> Hydrated
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-[#9C9F84] uppercase tracking-widest bg-[#9C9F84]/10 px-2 py-0.5 rounded-full border border-[#9C9F84]/30 animate-in fade-in zoom-in duration-300">
+                          <CheckCircle2 className="w-3 h-3" /> Hydrated
                         </div>
                       )}
                     </div>
-                    {/* ── HYDRATED GLOW: subtle ring around droplets when goal met ── */}
                     <div className={cn(
                       "flex gap-1 rounded-lg p-1 transition-all duration-500",
-                      waterGoalMet && "shadow-[0_0_12px_3px_rgba(71,85,105,0.25)] bg-slate-50 dark:bg-slate-900/30"
+                      waterGoalMet && "shadow-[0_0_15px_rgba(156,159,132,0.6)] bg-[#9C9F84]/5",
+                      waterJustCompleted && "animate-pulse"
                     )}>
                       {Array.from({ length: 8 }).map((_, i) => (
                         <button
@@ -875,8 +1295,12 @@ export default function Home() {
                           className={cn(
                             "w-6 h-8 rounded-full border-2 transition-all duration-300",
                             i < dayData.water
-                              ? "bg-blue-500 border-blue-500 scale-100 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                              : "border-blue-200 dark:border-blue-900/50 bg-transparent hover:border-blue-400 scale-95"
+                              ? waterGoalMet
+                                ? "bg-[#9C9F84] border-[#9C9F84] scale-100 shadow-[0_0_8px_rgba(156,159,132,0.6)]"
+                                : "bg-blue-500 border-blue-500 scale-100 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                              : waterGoalMet
+                                ? "border-[#9C9F84]/30 bg-transparent hover:border-[#9C9F84]/60 scale-95"
+                                : "border-blue-200 dark:border-blue-900/50 bg-transparent hover:border-blue-400 scale-95"
                           )}
                         />
                       ))}
