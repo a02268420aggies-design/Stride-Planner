@@ -727,6 +727,50 @@ export default function Home() {
   const anyNudge = taskBank.some(t => isNudgeApproaching(t) || isNudgeOverdue(t));
   const prioritiesCompleted = prioritiesArray.filter((p) => p.is_done).length;
   const goalsCompleted = goalsArray.filter((g) => g.is_done).length;
+
+  // ─── Dynamic weighted center percentage ──────────────────────────────────────
+  // Only average categories that have at least 1 task (active categories)
+  // 3/3 Priorities + 0/0 Tasks/Goals → 100% (not 33%)
+  const activeCategories: { completed: number; total: number }[] = [
+    ...(tasksArray.length > 0 ? [{ completed: tasksCompleted, total: tasksArray.length }] : []),
+    ...(prioritiesArray.length > 0 ? [{ completed: prioritiesCompleted, total: prioritiesArray.length }] : []),
+    ...(goalsArray.length > 0 ? [{ completed: goalsCompleted, total: goalsArray.length }] : []),
+  ];
+  const centerPercent = activeCategories.length === 0
+    ? null  // all empty → show "Ready"
+    : Math.round(activeCategories.reduce((sum, c) => sum + (c.completed / c.total), 0) / activeCategories.length * 100);
+
+  // ─── Ring pulse — detect when a category's total increases ───────────────────
+  const prevOuterTotal = useRef(tasksArray.length);
+  const prevInnerTotal = useRef(prioritiesArray.length);
+  const prevCenterTotal = useRef(goalsArray.length);
+  const [pulsingRing, setPulsingRing] = useState<"outer" | "inner" | "center" | null>(null);
+
+  useEffect(() => {
+    if (tasksArray.length > prevOuterTotal.current) {
+      setPulsingRing("outer");
+      setTimeout(() => setPulsingRing(null), 800);
+    }
+    prevOuterTotal.current = tasksArray.length;
+  }, [tasksArray.length]);
+
+  useEffect(() => {
+    if (prioritiesArray.length > prevInnerTotal.current) {
+      setPulsingRing("inner");
+      setTimeout(() => setPulsingRing(null), 800);
+    }
+    prevInnerTotal.current = prioritiesArray.length;
+  }, [prioritiesArray.length]);
+
+  useEffect(() => {
+    if (goalsArray.length > prevCenterTotal.current) {
+      setPulsingRing("center");
+      setTimeout(() => setPulsingRing(null), 800);
+    }
+    prevCenterTotal.current = goalsArray.length;
+  }, [goalsArray.length]);
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const formattedDate = currentDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   const renderTagDot = (tagId?: string) => {
@@ -1091,11 +1135,44 @@ export default function Home() {
           </div>
           <div className="hidden sm:flex items-center gap-6 bg-white dark:bg-zinc-950 p-4 rounded-xl shadow-sm border border-zinc-100 dark:border-zinc-800 relative z-0 origin-right">
             <div className="flex flex-col text-sm font-medium gap-3">
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-brand-navy"></span><span className="text-zinc-600 dark:text-zinc-400">Tasks: {tasksCompleted}/{Math.max(1, tasksArray.length)}</span></div>
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-brand-sage"></span><span className="text-zinc-600 dark:text-zinc-400">Prior: {prioritiesCompleted}/{Math.max(1, prioritiesArray.length)}</span></div>
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-[#475569]"></span><span className="text-zinc-600 dark:text-zinc-400">Goals: {goalsCompleted}/{Math.max(1, goalsArray.length)}</span></div>
+              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-brand-navy"></span><span className="text-zinc-600 dark:text-zinc-400">Tasks: {tasksCompleted}/{tasksArray.length}</span></div>
+              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-brand-sage"></span><span className="text-zinc-600 dark:text-zinc-400">Prior: {prioritiesCompleted}/{prioritiesArray.length}</span></div>
+              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-[#475569]"></span><span className="text-zinc-600 dark:text-zinc-400">Goals: {goalsCompleted}/{goalsArray.length}</span></div>
             </div>
-            <ConcentricRings outerTotal={Math.max(1, tasksArray.length)} outerCompleted={tasksCompleted} innerTotal={Math.max(1, prioritiesArray.length)} innerCompleted={prioritiesCompleted} centerTotal={Math.max(1, goalsArray.length)} centerCompleted={goalsCompleted} className="scale-75 origin-right" />
+            {/* Rings wrapper */}
+            <div className="relative scale-75 origin-right">
+              {/* Per-ring opacity flash overlays — sit on top of each ring, flash on task add */}
+              {/* Outer ring (navy) flashes when a To-Do is added */}
+              {pulsingRing === "outer" && (
+                <div className="absolute inset-0 rounded-full animate-ring-flash-navy pointer-events-none z-10" />
+              )}
+              {/* Inner ring (sage) flashes when a Priority is added */}
+              {pulsingRing === "inner" && (
+                <div className="absolute inset-0 rounded-full animate-ring-flash-sage pointer-events-none z-10" />
+              )}
+              {/* Center ring (slate) flashes when a Goal is added */}
+              {pulsingRing === "center" && (
+                <div className="absolute inset-0 rounded-full animate-ring-flash-slate pointer-events-none z-10" />
+              )}
+              <ConcentricRings
+                outerTotal={tasksArray.length || 1}
+                outerCompleted={tasksArray.length === 0 ? 0 : tasksCompleted}
+                innerTotal={prioritiesArray.length || 1}
+                innerCompleted={prioritiesArray.length === 0 ? 0 : prioritiesCompleted}
+                centerTotal={goalsArray.length || 1}
+                centerCompleted={goalsArray.length === 0 ? 0 : goalsCompleted}
+              />
+              {/* White mask to hide the component's built-in center text */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-[38%] h-[38%] rounded-full bg-white dark:bg-zinc-950" />
+              </div>
+              {/* Our single center label — navy, same size as component's original */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-[11px] font-bold tabular-nums leading-none text-brand-navy dark:text-brand-navy">
+                  {centerPercent === null ? <span className="text-[#475569]/50">Ready</span> : `${centerPercent}%`}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
