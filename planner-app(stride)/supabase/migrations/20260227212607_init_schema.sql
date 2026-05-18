@@ -51,3 +51,47 @@ CREATE POLICY "Users can manage their own projects" ON public.projects FOR ALL U
 CREATE POLICY "Users can manage their own tags" ON public.tags FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can manage their own tasks" ON public.tasks FOR ALL USING (auth.uid() = user_id);
+
+-- Create weekly_journal table
+CREATE TABLE public.weekly_journal (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  week_key TEXT NOT NULL,
+  takeaway TEXT,
+  proud_of TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(user_id, week_key)
+);
+
+ALTER TABLE public.weekly_journal ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own weekly journal" ON public.weekly_journal FOR ALL USING (auth.uid() = user_id);
+
+-- Create weekly_goals table
+CREATE TABLE public.weekly_goals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  week_key TEXT NOT NULL,
+  goal_1 TEXT,
+  goal_2 TEXT,
+  goal_3 TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(user_id, week_key)
+);
+
+ALTER TABLE public.weekly_goals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own weekly goals" ON public.weekly_goals FOR ALL USING (auth.uid() = user_id);
+
+-- Create monthly_milestones table
+CREATE TABLE public.monthly_milestones (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  month_key TEXT NOT NULL,
+  milestone TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+ALTER TABLE public.monthly_milestones ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own monthly milestones" ON public.monthly_milestones FOR ALL USING (auth.uid() = user_id);
