@@ -13,8 +13,9 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { CSS } from "@dnd-kit/utilities";
 
 type TagItem = { id: string; name: string; color: string; };
-type MasterTask = { id: string; text: string; is_priority: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
-type TaskItem = { id: string; master_id: string; text: string; is_done: boolean; is_priority: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
+type RecurringTask = { id: string; text: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
+type MasterTask = { id: string; text: string; is_priority: boolean; is_goal?: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
+type TaskItem = { id: string; master_id: string; text: string; is_done: boolean; is_priority: boolean; is_goal?: boolean; priority_rank?: number; todo_rank?: number; goal_rank?: number; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
 type DeletedTask = MasterTask & { deletedAt: string; };
 
 type MealType = "B" | "L" | "D" | "S";
@@ -171,7 +172,7 @@ const findTagNameByColor = (colorHex: string, tagsList: TagItem[]): string | nul
   return match ? match.name : null;
 };
 
-const SortablePriorityItem = ({ id, className, isDraggingClass, children }: { id: string; className?: string; isDraggingClass?: string; children: React.ReactNode }) => {
+const SortableListItem = ({ id, className, isDraggingClass, children }: { id: string; className?: string; isDraggingClass?: string; children: React.ReactNode }) => {
   const {
     attributes,
     listeners,
@@ -193,7 +194,7 @@ const SortablePriorityItem = ({ id, className, isDraggingClass, children }: { id
       className={cn(
         className,
         "relative",
-        isDragging && (isDraggingClass || "scale-[1.02] shadow-xl bg-white dark:bg-zinc-900 z-50 border-transparent opacity-90")
+        isDragging && (isDraggingClass || "scale-[1.02] shadow-xl bg-white dark:bg-zinc-900 z-[100] border-transparent opacity-90")
       )}
     >
       <div 
@@ -236,7 +237,8 @@ const TaskBankCard = ({
   setCurrentDate,
   setViewMode,
   closeTaskBank,
-  setRecurringModalTask
+  setRecurringModalTask,
+  setEditingTask
 }: any) => {
   const [localPriority, setLocalPriority] = useState(task.is_priority);
   const [pulseColor, setPulseColor] = useState<string | null>(null);
@@ -289,7 +291,7 @@ const TaskBankCard = ({
         </button>
         <div className="flex-1 flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">{task.text}</span>
+            <span onClick={() => setEditingTask(task)} className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer rounded px-1 transition-colors">{task.text}</span>
             {(task.dueDate || task.due_date) && (
               <button 
                 onClick={(e) => {
@@ -486,10 +488,115 @@ const TaskBankCard = ({
     </div>
   );
 };
+const EditTaskModal = ({ task, tags, onSave, onClose }: { task: MasterTask, tags: TagItem[], onSave: (t: MasterTask) => void, onClose: () => void }) => {
+  const [text, setText] = useState(task.text);
+  const [dueDate, setDueDate] = useState(task.due_date || task.dueDate || "");
+  const [tagId, setTagId] = useState(task.tag_id || "");
+  const [nudgeDate, setNudgeDate] = useState(task.nudgeDate ? new Date(task.nudgeDate).toISOString().slice(0, 16) : "");
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[300] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/50">
+          <h2 className="text-lg font-bold text-brand-navy dark:text-zinc-100 flex items-center gap-2">
+            <Edit3 className="w-5 h-5 text-brand-sage" /> Edit Task
+          </h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-zinc-500" />
+          </button>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Task Title</label>
+            <input 
+              type="text" 
+              value={text} 
+              onChange={e => setText(e.target.value)} 
+              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
+              autoFocus
+            />
+          </div>
+          
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Due Date</label>
+            <input 
+              type="date" 
+              value={dueDate} 
+              onChange={e => setDueDate(e.target.value)} 
+              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tag</label>
+            <select 
+              value={tagId} 
+              onChange={e => setTagId(e.target.value)}
+              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
+            >
+              <option value="">No Tag</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" /> Nudge Time</label>
+            <input 
+              type="datetime-local" 
+              value={nudgeDate} 
+              onChange={e => setNudgeDate(e.target.value)} 
+              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
+            />
+            {nudgeDate && <button onClick={() => setNudgeDate("")} className="text-xs text-red-500 text-left mt-1 hover:underline">Clear Nudge</button>}
+          </div>
+        </div>
+        
+        <div className="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-3 bg-zinc-50/50 dark:bg-zinc-950/50">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
+          <button 
+            onClick={() => {
+              if (!text.trim()) return;
+              onSave({
+                ...task,
+                text: text.trim(),
+                due_date: dueDate || undefined,
+                dueDate: dueDate || undefined,
+                tag_id: tagId || undefined,
+                nudgeDate: nudgeDate ? new Date(nudgeDate).toISOString() : undefined,
+                isReminderActive: !!nudgeDate,
+                reminderTime: nudgeDate ? new Date(nudgeDate).toISOString() : undefined
+              });
+            }}
+            className="px-6 py-2 text-sm font-bold bg-brand-navy dark:bg-brand-sage text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 export default function Home() {
   const [hasMounted, setHasMounted] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState('priorities');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -502,7 +609,84 @@ export default function Home() {
   const [activeNudgeDropdownId, setActiveNudgeDropdownId] = useState<string | null>(null);
   const [activeTagDropdownId, setActiveTagDropdownId] = useState<string | null>(null);
   const [schedulingStates, setSchedulingStates] = useState<Record<string, 'success' | 'error'>>({});
+  const [editingTask, setEditingTask] = useState<MasterTask | null>(null);
 
+  const handleSaveEditedTask = (updatedTask: MasterTask) => {
+    setTaskBank((prev) => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+
+    setDataStore((prev) => {
+      const next = { ...prev };
+      
+      const oldMasterTask = taskBank.find(t => t.id === updatedTask.id);
+      const oldDate = oldMasterTask?.due_date || oldMasterTask?.dueDate;
+      const newDate = updatedTask.due_date || updatedTask.dueDate;
+      
+      let itemToMigrate: TaskItem | null = null;
+      
+      if (oldDate !== newDate) {
+         Object.keys(next).forEach(key => {
+           if (next[key] && next[key].items) {
+             const idx = next[key].items.findIndex((item: any) => item.master_id === updatedTask.id);
+             if (idx !== -1) {
+                itemToMigrate = { ...next[key].items[idx] };
+                next[key] = { ...next[key], items: next[key].items.filter((_, i) => i !== idx) };
+             }
+           }
+         });
+         
+         if (itemToMigrate) {
+            const destKey = newDate || "BUFFER";
+            if (!next[destKey]) next[destKey] = getEmptyDay();
+            next[destKey] = {
+              ...next[destKey],
+              items: [...next[destKey].items, itemToMigrate]
+            };
+         }
+      }
+      
+      Object.keys(next).forEach(key => {
+        if (next[key] && next[key].items) {
+          next[key] = {
+            ...next[key],
+            items: next[key].items.map((item: any) => {
+              if (item.master_id === updatedTask.id) {
+                 return {
+                   ...item,
+                   text: updatedTask.text,
+                   tag_id: updatedTask.tag_id,
+                   due_date: updatedTask.due_date,
+                   dueDate: updatedTask.dueDate,
+                   nudgeDate: updatedTask.nudgeDate,
+                   reminderTime: updatedTask.reminderTime,
+                   isReminderActive: updatedTask.isReminderActive
+                 };
+              }
+              return item;
+            })
+          };
+        }
+      });
+      
+      return next;
+    });
+    
+    setEditingTask(null);
+  };
+
+  const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("stride_recurringTasks");
+      if (saved) return JSON.parse(saved);
+    }
+    return [];
+  });
+  const [completedRoutines, setCompletedRoutines] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("stride_completedRoutines");
+      if (saved) return JSON.parse(saved);
+    }
+    return {};
+  });
   // Recurring Dispatch Engine State
   const [recurringModalTask, setRecurringModalTask] = useState<any>(null);
   const [recurringDays, setRecurringDays] = useState<number[]>([]); // 0 = Sun, 1 = Mon ...
@@ -520,24 +704,109 @@ export default function Home() {
       const dayData = prev[dateKey];
       if (!dayData || !dayData.items) return prev;
       
-      const goalsTagId = (prev["TAGS"] || []).find((t: any) => t.name.toLowerCase() === "goals")?.id;
-      const priorities = dayData.items.filter((t: any) => t.is_priority && t.tag_id !== goalsTagId);
-      const prioritySlots = Array.from({ length: 5 }).map((_, i) => priorities[i] || { id: `empty-slot-${i}`, is_empty: true });
-      const otherItems = dayData.items.filter((t: any) => !(t.is_priority && t.tag_id !== goalsTagId));
+      const goalsTagId = tags.find((t: any) => t.name.toLowerCase() === "goals")?.id;
+      const rawPriorities = dayData.items.filter((t: any) => t.is_priority && t.tag_id !== goalsTagId);
       
-      const oldIndex = prioritySlots.findIndex((t: any) => t.id === active.id);
-      const newIndex = prioritySlots.findIndex((t: any) => t.id === over.id);
+      let unranked = rawPriorities.filter((t: any) => t.priority_rank === undefined);
+      const computedSlots = Array.from({ length: 5 }).map((_, i) => {
+        const explicit = rawPriorities.find((t: any) => t.priority_rank === i);
+        if (explicit) return explicit;
+        if (unranked.length > 0) return unranked.shift();
+        return { id: `empty-slot-${i}`, is_empty: true };
+      });
+      
+      const oldIndex = computedSlots.findIndex((t: any) => t.id === active.id);
+      const newIndex = computedSlots.findIndex((t: any) => t.id === over.id);
       
       if (oldIndex === -1 || newIndex === -1) return prev;
       
-      const newSlots = arrayMove(prioritySlots, oldIndex, newIndex);
-      const newPriorities = newSlots.filter(t => !t.is_empty);
+      const newSlots = arrayMove(computedSlots, oldIndex, newIndex);
+      const newPriorities = newSlots.map((t: any, i: number) => t.is_empty ? null : { ...t, priority_rank: i }).filter(Boolean);
+      const otherItems = dayData.items.filter((t: any) => !(t.is_priority && t.tag_id !== goalsTagId));
       
       return {
         ...prev,
         [dateKey]: {
           ...dayData,
           items: [...newPriorities, ...otherItems]
+        }
+      };
+    });
+  };
+
+  const handleTodoDragEnd = (event: DragEndEvent, dateKey: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setDataStore((prev: any) => {
+      const dayData = prev[dateKey];
+      if (!dayData || !dayData.items) return prev;
+      
+      const goalsTagId = tags.find((t: any) => t.name.toLowerCase() === "goals")?.id;
+      const rawTodos = dayData.items.filter((t: any) => !t.is_priority && t.tag_id !== goalsTagId);
+      
+      let unranked = rawTodos.filter((t: any) => t.todo_rank === undefined);
+      const maxLen = Math.max(9, rawTodos.length);
+      const computedSlots = Array.from({ length: maxLen }).map((_, i) => {
+        const explicit = rawTodos.find((t: any) => t.todo_rank === i);
+        if (explicit) return explicit;
+        if (unranked.length > 0) return unranked.shift();
+        return { id: `empty-todo-slot-${i}`, is_empty: true };
+      });
+      
+      const oldIndex = computedSlots.findIndex((t: any) => t.id === active.id);
+      const newIndex = computedSlots.findIndex((t: any) => t.id === over.id);
+      
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      
+      const newSlots = arrayMove(computedSlots, oldIndex, newIndex);
+      const newTodos = newSlots.map((t: any, i: number) => t.is_empty ? null : { ...t, todo_rank: i }).filter(Boolean);
+      const otherItems = dayData.items.filter((t: any) => t.is_priority || t.tag_id === goalsTagId);
+      
+      return {
+        ...prev,
+        [dateKey]: {
+          ...dayData,
+          items: [...newTodos, ...otherItems]
+        }
+      };
+    });
+  };
+
+  const handleGoalDragEnd = (event: DragEndEvent, dateKey: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setDataStore((prev: any) => {
+      const dayData = prev[dateKey];
+      if (!dayData || !dayData.items) return prev;
+      
+      const goalsTagId = tags.find((t: any) => t.name.toLowerCase() === "goals")?.id;
+      const rawGoals = dayData.items.filter((t: any) => t.tag_id === goalsTagId);
+      
+      let unranked = rawGoals.filter((t: any) => t.goal_rank === undefined);
+      const maxLen = Math.max(5, rawGoals.length);
+      const computedSlots = Array.from({ length: maxLen }).map((_, i) => {
+        const explicit = rawGoals.find((t: any) => t.goal_rank === i);
+        if (explicit) return explicit;
+        if (unranked.length > 0) return unranked.shift();
+        return { id: `empty-goal-slot-${i}`, is_empty: true };
+      });
+      
+      const oldIndex = computedSlots.findIndex((t: any) => t.id === active.id);
+      const newIndex = computedSlots.findIndex((t: any) => t.id === over.id);
+      
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      
+      const newSlots = arrayMove(computedSlots, oldIndex, newIndex);
+      const newGoals = newSlots.map((t: any, i: number) => t.is_empty ? null : { ...t, goal_rank: i }).filter(Boolean);
+      const otherItems = dayData.items.filter((t: any) => t.tag_id !== goalsTagId);
+      
+      return {
+        ...prev,
+        [dateKey]: {
+          ...dayData,
+          items: [...newGoals, ...otherItems]
         }
       };
     });
@@ -728,6 +997,7 @@ export default function Home() {
 
   const [expandedHeaders, setExpandedHeaders] = useState<string[]>([]);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
+  const [bankActiveTab, setBankActiveTab] = useState<'tasks' | 'routines'>('tasks');
   const [newMealName, setNewMealName] = useState("");
   const [newMealType, setNewMealType] = useState<MealType>("D");
   const [newMealIngs, setNewMealIngs] = useState("");
@@ -814,8 +1084,14 @@ export default function Home() {
   const [newTaskTime, setNewTaskTime] = useState("");
   const [newTaskNotes, setNewTaskNotes] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState(false);
+  const [newTaskIsGoal, setNewTaskIsGoal] = useState(false);
   const [newTaskReminderTime, setNewTaskReminderTime] = useState("");
   const [newTaskReminderActive, setNewTaskReminderActive] = useState(false);
+  const [newTaskIsRecurring, setNewTaskIsRecurring] = useState(false);
+  const [newTaskRecurringDays, setNewTaskRecurringDays] = useState<number[]>([]);
+  const [newTaskRecurringEnd, setNewTaskRecurringEnd] = useState("");
+  const [newTaskShowOnWeek, setNewTaskShowOnWeek] = useState(false);
+  const [newTaskShowOnMonth, setNewTaskShowOnMonth] = useState(false);
 
   const [waterJustCompleted, setWaterJustCompleted] = useState(false);
   const [archivedFlashId, setArchivedFlashId] = useState<string | null>(null);
@@ -1356,6 +1632,16 @@ export default function Home() {
   };
 
   const toggleDayTaskDone = (id: string) => {
+    if (id.startsWith("recur_")) {
+      setCompletedRoutines(prev => {
+        const isDone = !!prev[id];
+        if (!isDone) {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#4ade80', '#22c55e', '#16a34a'] });
+        }
+        return { ...prev, [id]: !isDone };
+      });
+      return;
+    }
     const existingDay = getDayData(dateKey);
     const task = existingDay.items.find(t => t.id === id);
     const willBecomeDone = task ? !task.is_done : false;
@@ -1380,37 +1666,17 @@ export default function Home() {
     }
 
     if (task && willBecomeDone && taskBank.some(t => t.id === task.master_id)) {
-      if (task.due_date === dateKey) {
-        // Exact due date match — archive immediately, no confirmation
-        setArchivedFlashId(task.id);
-        setTimeout(() => setArchivedFlashId(null), 800);
-        setTimeout(() => archiveMasterTask(task.master_id), 300);
-      } else {
-        // Early or manual completion — ask first
-        setArchiveConfirmId(task.id);
-      }
+      setArchiveConfirmId(task.id);
     }
   };
 
   // Called by the daily PackageCheck button
   const smartArchiveFromDay = (task: TaskItem) => {
-    if (task.due_date === dateKey) {
-      // On the due date — mark done and archive immediately
-      setDataStore((prevStore) => {
-        const day = prevStore[dateKey] || getEmptyDay();
-        return { ...prevStore, [dateKey]: { ...day, items: day.items.map(t => t.id === task.id ? { ...t, is_done: true } : t) } };
-      });
-      setArchivedFlashId(task.id);
-      setTimeout(() => setArchivedFlashId(null), 800);
-      setTimeout(() => archiveMasterTask(task.master_id), 300);
-    } else {
-      // Off due-date — mark done on this day, then ask
-      setDataStore((prevStore) => {
-        const day = prevStore[dateKey] || getEmptyDay();
-        return { ...prevStore, [dateKey]: { ...day, items: day.items.map(t => t.id === task.id ? { ...t, is_done: true } : t) } };
-      });
-      setArchiveConfirmId(task.id);
-    }
+    setDataStore((prevStore) => {
+      const day = prevStore[dateKey] || getEmptyDay();
+      return { ...prevStore, [dateKey]: { ...day, items: day.items.map(t => t.id === task.id ? { ...t, is_done: true } : t) } };
+    });
+    setArchiveConfirmId(task.id);
   };
 
   const confirmArchive = (task: TaskItem) => {
@@ -1717,18 +1983,30 @@ export default function Home() {
     let finalTagId = newTaskTagId;
     if (isCreatingTag && newTagName.trim()) finalTagId = handleAddTag() || "";
     const newMasterId = `m_${Date.now()}`;
-    const newMasterTask: MasterTask = { id: newMasterId, text: newTaskText.trim(), is_priority: newTaskPriority, tag_id: finalTagId || undefined, due_date: newTaskDate, time: newTaskTime, notes: newTaskNotes, reminderTime: newTaskReminderTime || undefined, isReminderActive: newTaskReminderActive };
-    setTaskBank((prev) => [...prev, newMasterTask]);
-    scheduleTaskToDay(newMasterTask, newTaskDate || dateKey);
+    if (newTaskIsRecurring) {
+      const newRecurring: RecurringTask = {
+        id: `rt_${Date.now()}`, text: newTaskText.trim(), time: newTaskTime || undefined,
+        tag_id: finalTagId || undefined, is_priority: newTaskPriority, is_goal: newTaskIsGoal,
+        daysOfWeek: newTaskRecurringDays, endDate: newTaskRecurringEnd || undefined,
+        showOnWeek: newTaskShowOnWeek, showOnMonth: newTaskShowOnMonth
+      };
+      setRecurringTasks(prev => [...prev, newRecurring]);
+    } else {
+      const newMasterTask: MasterTask = { id: newMasterId, text: newTaskText.trim(), is_priority: newTaskPriority, is_goal: newTaskIsGoal, tag_id: finalTagId || undefined, due_date: newTaskDate, time: newTaskTime, notes: newTaskNotes, reminderTime: newTaskReminderTime || undefined, isReminderActive: newTaskReminderActive };
+      setTaskBank((prev) => [...prev, newMasterTask]);
+      scheduleTaskToDay(newMasterTask, newTaskDate || dateKey);
+    }
     setIsModalOpen(false);
     resetModal();
   };
 
   const resetModal = () => {
     setNewTaskText(""); setNewTaskTagId(""); setNewTaskDate(dateKey);
-    setNewTaskTime(""); setNewTaskNotes(""); setNewTaskPriority(false);
+    setNewTaskTime(""); setNewTaskNotes(""); setNewTaskPriority(false); setNewTaskIsGoal(false);
     setNewTaskReminderTime(""); setNewTaskReminderActive(false);
     setIsCreatingTag(false); setIsPaletteOpen(false);
+    setNewTaskIsRecurring(false); setNewTaskRecurringDays([]); setNewTaskRecurringEnd("");
+    setNewTaskShowOnWeek(false); setNewTaskShowOnMonth(false);
   };
 
   const scheduleTaskToDay = (masterTask: MasterTask, targetDateKey: string) => {
@@ -1783,6 +2061,7 @@ export default function Home() {
       id: newMasterId,
       text: text.trim(),
       is_priority: false,
+      is_goal: true,
       tag_id: goalsTagId,
       due_date: dateKey,
     };
@@ -1970,10 +2249,53 @@ export default function Home() {
     setIsCreatingTag(false); setIsPaletteOpen(false);
   };
 
-  const goalsArray = dayData.items.filter(t => t.tag_id === goalsTagId);
-  const prioritiesArray = dayData.items.filter(t => t.is_priority && t.tag_id !== goalsTagId);
-  const tasksArray = dayData.items.filter(t => !t.is_priority && t.tag_id !== goalsTagId);
+  const computedDailyItems = useMemo(() => {
+    const items = [...dayData.items];
+    if (dateKey === "BUFFER" || dateKey.startsWith("BUFFER_")) return items;
+    const activeDate = new Date(dateKey + 'T00:00:00');
+    const dow = activeDate.getDay();
+    recurringTasks.forEach(rt => {
+      if (rt.daysOfWeek.includes(dow)) {
+        if (rt.endDate && activeDate > new Date(rt.endDate + 'T00:00:00')) return;
+        if (items.some(i => i.master_id === rt.id)) return;
+        const compositeKey = `recur_${rt.id}_${dateKey}`;
+        items.push({
+          id: compositeKey, master_id: rt.id, text: rt.text, is_done: !!completedRoutines[compositeKey],
+          is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
+        });
+      }
+    });
+    return items;
+  }, [dayData.items, dateKey, recurringTasks, completedRoutines]);
+
+  const goalsArray = computedDailyItems.filter(t => t.tag_id === goalsTagId);
+  const prioritiesArray = computedDailyItems.filter(t => t.is_priority && t.tag_id !== goalsTagId);
+  const tasksArray = computedDailyItems.filter(t => !t.is_priority && t.tag_id !== goalsTagId);
   const getMealText = (type: MealType) => dayData.meals.find(m => m.type === type)?.text || "";
+
+  let unrankedPriorities = prioritiesArray.filter(t => t.priority_rank === undefined);
+  const priorityRenderSlots = Array.from({ length: 5 }).map((_, i) => {
+    const explicit = prioritiesArray.find(t => t.priority_rank === i);
+    if (explicit) return explicit;
+    if (unrankedPriorities.length > 0) return unrankedPriorities.shift();
+    return null;
+  });
+
+  let unrankedTodos = tasksArray.filter(t => t.todo_rank === undefined);
+  const todoRenderSlots = Array.from({ length: Math.max(9, tasksArray.length) }).map((_, i) => {
+    const explicit = tasksArray.find(t => t.todo_rank === i);
+    if (explicit) return explicit;
+    if (unrankedTodos.length > 0) return unrankedTodos.shift();
+    return null;
+  });
+
+  let unrankedGoals = goalsArray.filter(t => t.goal_rank === undefined);
+  const goalRenderSlots = Array.from({ length: Math.max(5, goalsArray.length) }).map((_, i) => {
+    const explicit = goalsArray.find(t => t.goal_rank === i);
+    if (explicit) return explicit;
+    if (unrankedGoals.length > 0) return unrankedGoals.shift();
+    return null;
+  });
 
   // ─── Derived goal states (tied to dateKey via dayData) ────────────────────
   const stepsGoalMet = parseInt(dayData.steps || "0") >= parseInt(dayData.step_goal || "10000");
@@ -2126,7 +2448,7 @@ export default function Home() {
               />
             </div>
             {(mealSuggestions.length > 0 || (!exactMealMatch && mealInputValue.trim() !== "")) && (
-              <div className="absolute top-full left-0 mt-2 w-[110%] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-md shadow-2xl overflow-hidden py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="absolute top-full left-0 mt-2 w-[110%] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-md shadow-2xl overflow-hidden py-1 z-[200] animate-in fade-in slide-in-from-top-2 duration-200">
                 {mealSuggestions.map((suggestion, idx) => (
                   <button key={idx} type="button"
                     onMouseEnter={() => setMealFocusedIndex(idx)}
@@ -2191,7 +2513,23 @@ export default function Home() {
     const isBuffer = colKey === "BUFFER";
     const isToday = colKey === getDateKey(new Date());
     const dayData = dataStore[colKey] || getEmptyDay();
-    const items = dayData.items;
+    
+    let items = [...dayData.items];
+    if (colKey !== "BUFFER" && !colKey.startsWith("BUFFER_")) {
+        const activeDate = new Date(colKey + 'T00:00:00');
+        const dow = activeDate.getDay();
+        recurringTasks.forEach(rt => {
+          if (rt.showOnWeek && rt.daysOfWeek.includes(dow)) {
+            if (rt.endDate && activeDate > new Date(rt.endDate + 'T00:00:00')) return;
+            if (items.some(i => i.master_id === rt.id)) return;
+            const compositeKey = `recur_${rt.id}_${colKey}`;
+            items.push({
+              id: compositeKey, master_id: rt.id, text: rt.text, is_done: !!completedRoutines[compositeKey],
+              is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
+            } as any);
+          }
+        });
+    }
 
     const tCompleted = items.filter(t => t.is_done && !t.is_priority && t.tag_id !== goalsTagId).length;
     const tTotal = items.filter(t => !t.is_priority && t.tag_id !== goalsTagId).length;
@@ -2333,8 +2671,10 @@ export default function Home() {
                         )}
                         {isBuffer && <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700 mt-2 shrink-0" />}
                         <div className="flex-1 flex items-center min-w-0 pr-8">
-                           <div className="flex items-center gap-2 mt-0.5">
+                           <div className="flex items-center gap-2 mt-0.5 shrink-0">
                              {renderTagDot(task.tag_id)}
+                             {(task.is_goal || task.tag_id === goalsTagId) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
+                             {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
                            </div>
                            <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
                              {task.text}
@@ -2420,7 +2760,7 @@ export default function Home() {
                                <button type="button" onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm border border-black/10 transition-transform hover:scale-110" style={{ backgroundColor: tempTagColor }} title="Change tag color" />
                              ) : (<Tag className="w-3.5 h-3.5 text-zinc-400 shrink-0" />)}
                              {isPaletteOpen && activeInlineCol === colKey && (
-                               <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2 w-max animate-in fade-in slide-in-from-top-2 duration-100">
+                               <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-[200] flex gap-2 w-max animate-in fade-in slide-in-from-top-2 duration-100">
                                  {aestheticColors.map(color => (
                                    <button key={color} type="button" className={cn("w-5 h-5 rounded-full hover:scale-110 transition-transform", tempTagColor === color && "ring-2 ring-offset-2 ring-brand-navy dark:ring-offset-zinc-800")} style={{ backgroundColor: color }} onClick={() => handleUpdateTagColor(color)} />
                                  ))}
@@ -2606,23 +2946,56 @@ export default function Home() {
             </div>
             <button onClick={() => closeTaskBank()} className="p-2 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5" /></button>
           </div>
-          <div className="flex gap-2 items-center">
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search..." value={bankSearchQuery || ""} onChange={e => setBankSearchQuery(e.target.value)} className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-9 pr-3 py-1.5 focus:outline-none focus:border-brand-navy/50 transition-colors text-sm outline-none" />
-            </div>
-            <select value={bankFilterTagId || ""} onChange={e => setBankFilterTagId(e.target.value)} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-navy/50 transition-colors text-sm text-zinc-700 dark:text-zinc-300 min-w-[100px] outline-none">
-              <option value="ALL">All Tags</option>
-              <option value="untagged">Untagged</option>
-              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+          <div className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-2">
+            <button onClick={() => setBankActiveTab('tasks')} className={cn("px-4 py-2 text-sm font-bold border-b-2 transition-colors", bankActiveTab === 'tasks' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Tasks</button>
+            <button onClick={() => setBankActiveTab('routines')} className={cn("px-4 py-2 text-sm font-bold border-b-2 transition-colors", bankActiveTab === 'routines' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Routines</button>
           </div>
+          {bankActiveTab === 'tasks' && (
+            <div className="flex gap-2 items-center mt-3">
+              <div className="flex-1 relative">
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input type="text" placeholder="Search..." value={bankSearchQuery || ""} onChange={e => setBankSearchQuery(e.target.value)} className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-9 pr-3 py-1.5 focus:outline-none focus:border-brand-navy/50 transition-colors text-sm outline-none" />
+              </div>
+              <select value={bankFilterTagId || ""} onChange={e => setBankFilterTagId(e.target.value)} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-navy/50 transition-colors text-sm text-zinc-700 dark:text-zinc-300 min-w-[100px] outline-none">
+                <option value="ALL">All Tags</option>
+                <option value="untagged">Untagged</option>
+                {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div 
           className="flex-1 overflow-y-auto p-5 flex flex-col gap-8"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {sortedTagKeys.length === 0 ? (
+          {bankActiveTab === 'routines' ? (
+            <div className="flex flex-col gap-4">
+              {recurringTasks.length === 0 ? (
+                <div className="text-center text-zinc-500 mt-10 text-sm">No active routines. Create one in the New Task menu!</div>
+              ) : (
+                recurringTasks.map(rt => (
+                  <div key={rt.id} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{rt.text}</span>
+                        {rt.tag_id && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tagsById[rt.tag_id]?.color }} />}
+                      </div>
+                      <button onClick={() => setRecurringTasks(prev => prev.filter(r => r.id !== rt.id))} className="text-xs font-bold px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">Delete / End Routine</button>
+                    </div>
+                    <div className="text-xs text-zinc-500 font-semibold flex flex-wrap gap-x-4 gap-y-1">
+                      <span>Days: {rt.daysOfWeek.map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(', ')}</span>
+                      {rt.time && <span>Time: {rt.time}</span>}
+                      {rt.endDate && <span className="text-amber-600">Ends: {rt.endDate}</span>}
+                    </div>
+                    <div className="text-[10px] uppercase font-bold text-zinc-400 mt-1 flex gap-3">
+                      {rt.showOnWeek && <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">Weekly View</span>}
+                      {rt.showOnMonth && <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">Monthly View</span>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : sortedTagKeys.length === 0 ? (
             <div className="text-center text-zinc-500 mt-10 text-sm">No tasks in the bank.</div>
           ) : (
             sortedTagKeys.map(tagId => {
@@ -2695,6 +3068,7 @@ export default function Home() {
                             setCurrentDate={setCurrentDate}
                             setViewMode={setViewMode}
                             closeTaskBank={closeTaskBank}
+                            setEditingTask={setEditingTask}
                           />
                         );
                       })}
@@ -2939,7 +3313,7 @@ export default function Home() {
           <div className="bg-white dark:bg-zinc-950/90 border border-brand-navy/20 dark:border-brand-sage/20 w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh]">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center bg-zinc-50/50 dark:bg-zinc-900/30">
               <h2 className="text-2xl font-black text-brand-navy dark:text-brand-sage flex items-center gap-2">
-                <LineChart className="w-6 h-6" /> Weekly Insights
+                <LineChart className="w-6 h-6" /> {insightsViewMode === 'monthly' ? 'Monthly Insights' : 'Weekly Insights'}
               </h2>
               <button onClick={() => setShowInsights(false)} className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors bg-white dark:bg-zinc-800 rounded-full shadow-sm"><X className="w-5 h-5" /></button>
             </div>
@@ -2966,48 +3340,7 @@ export default function Home() {
                 
                 {insightsData.totalCompleted === 0 ? (
                   <div className="w-full h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-xs font-bold text-zinc-400 italic">No tasks completed this period.</div>
-                ) : insightsViewMode === 'monthly' ? (
-                   // Pie Chart SVG Renderer
-                   <div className="flex flex-col sm:flex-row items-center gap-8 py-4">
-                      <div className="relative w-40 h-40 shrink-0 drop-shadow-xl saturate-150">
-                         <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 origin-center drop-shadow-sm">
-                           {(() => {
-                              let cumulativeOffset = 0;
-                              return insightsData.sortedTags.map((tag: any) => {
-                                 const pct = (tag.count / insightsData.totalCompleted) * 100;
-                                 const strokeDasharray = `${pct} ${100 - pct}`;
-                                 const strokeDashoffset = 100 - cumulativeOffset;
-                                 cumulativeOffset += pct;
-                                 return pct > 0 ? (
-                                    <circle 
-                                      key={tag.id} r="25" cx="50" cy="50" fill="transparent" 
-                                      stroke={tag.color} strokeWidth="50"
-                                      strokeDasharray={strokeDasharray} strokeDashoffset={strokeDashoffset} 
-                                      pathLength="100"
-                                      className="transition-all duration-1000 ease-out hover:opacity-80 cursor-pointer"
-                                    />
-                                 ) : null;
-                              });
-                           })()}
-                         </svg>
-                         <div className="absolute inset-0 m-auto w-24 h-24 bg-white dark:bg-zinc-900 rounded-full shadow-inner flex items-center justify-center pointer-events-none">
-                            <span className="text-2xl font-black text-brand-navy dark:text-brand-sage">{insightsData.totalCompleted}</span>
-                         </div>
-                      </div>
-                      <div className="flex flex-col gap-3 flex-1 w-full justify-center">
-                         {insightsData.sortedTags.map((tag: any) => (
-                           <div key={tag.id} className="flex justify-between items-center text-sm font-bold text-zinc-600 dark:text-zinc-300">
-                             <div className="flex items-center gap-2">
-                               <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: tag.color }} />
-                               {tag.name}
-                             </div>
-                             <span className="text-brand-sage bg-brand-sage/10 px-2 py-0.5 rounded-full text-[10px]">{Math.round((tag.count / insightsData.totalCompleted) * 100)}%</span>
-                           </div>
-                         ))}
-                      </div>
-                   </div>
                 ) : (
-                  // Weekly Stacked Bar
                   <>
                   <div className="relative w-full h-10 rounded-2xl overflow-hidden flex shadow-inner border border-zinc-200 dark:border-zinc-800 saturate-150">
                     {insightsData.sortedTags.map((tag: any, i: number) => (
@@ -3582,6 +3915,16 @@ export default function Home() {
         </div>
       )}
 
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <EditTaskModal 
+          task={editingTask} 
+          tags={tags} 
+          onSave={handleSaveEditedTask} 
+          onClose={() => setEditingTask(null)} 
+        />
+      )}
+
       {/* Task Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -3595,6 +3938,18 @@ export default function Home() {
                 <button type="button" onClick={() => setNewTaskPriority(!newTaskPriority)} className="p-1 mt-0.5 hover:scale-110 transition-transform shrink-0" title="Toggle Priority">
                   <Star className={cn("w-6 h-6 transition-colors", newTaskPriority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
                 </button>
+                <button type="button" onClick={() => {
+                  const nextIsGoal = !newTaskIsGoal;
+                  setNewTaskIsGoal(nextIsGoal);
+                  if (nextIsGoal) {
+                    const goalTag = tags.find((t: any) => t.name.toLowerCase() === "goals");
+                    if (goalTag) setNewTaskTagId(goalTag.id);
+                  } else {
+                    setNewTaskTagId("");
+                  }
+                }} className="p-1 mt-0.5 hover:scale-110 transition-transform shrink-0" title="Toggle Goal">
+                  <Target className={cn("w-6 h-6 transition-colors", newTaskIsGoal ? "text-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
+                </button>
                 <div className="flex-1 flex flex-col">
                   <input type="text" value={newTaskText || ""} onChange={(e) => setNewTaskText(e.target.value)} placeholder="What do you need to do?" autoFocus className="w-full text-xl font-semibold bg-transparent border-0 border-b-2 border-transparent focus:border-brand-navy dark:focus:border-brand-navy focus:ring-0 px-1 pb-1 transition-colors text-zinc-900 dark:text-white placeholder:text-zinc-400" />
                 </div>
@@ -3606,7 +3961,7 @@ export default function Home() {
                       <button type="button" onClick={(e) => { e.stopPropagation(); setIsPaletteOpen(!isPaletteOpen); }} className="w-4 h-4 rounded-full shrink-0 shadow-sm border border-black/10 transition-transform hover:scale-110" style={{ backgroundColor: tempTagColor }} title="Change tag color" />
                     ) : (<Tag className="w-4 h-4 text-zinc-400 shrink-0" />)}
                     {isPaletteOpen && (
-                      <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2 w-max animate-in fade-in zoom-in-95 duration-100">
+                      <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-[200] flex gap-2 w-max animate-in fade-in zoom-in-95 duration-100">
                         {aestheticColors.map(color => (
                           <button key={color} type="button" className={cn("w-6 h-6 rounded-full hover:scale-110 transition-transform", tempTagColor === color && "ring-2 ring-offset-2 ring-brand-navy dark:ring-offset-zinc-800")} style={{ backgroundColor: color }} onClick={() => handleUpdateTagColor(color)} />
                         ))}
@@ -3637,6 +3992,39 @@ export default function Home() {
                 <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 col-span-2 focus-within:ring-2 ring-brand-navy/20">
                   <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
                   <input type="time" value={newTaskTime || ""} onChange={e => setNewTaskTime(e.target.value)} className="bg-transparent border-none text-sm outline-none w-full text-zinc-800 dark:text-zinc-200" />
+                </div>
+                {/* Make Recurring Toggle */}
+                <div className="col-span-2 flex flex-col gap-2 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-zinc-600 dark:text-zinc-300">
+                    <input type="checkbox" checked={newTaskIsRecurring} onChange={e => setNewTaskIsRecurring(e.target.checked)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-brand-sage checked:border-brand-sage transition-all" />
+                    Make Recurring?
+                  </label>
+                  {newTaskIsRecurring && (
+                    <div className="flex flex-col gap-3 p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg animate-in slide-in-from-top-2 duration-200">
+                      <div>
+                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Days of the week</span>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {["Su", "M", "T", "W", "Th", "F", "S"].map((d, i) => (
+                            <button type="button" key={d} onClick={() => setNewTaskRecurringDays(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])} className={cn("w-8 h-8 rounded-full text-xs font-bold transition-all", newTaskRecurringDays.includes(i) ? "bg-brand-sage text-white shadow-md" : "bg-white dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700 hover:border-brand-sage/50")}>
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">End Date (Optional)</span>
+                        <input type="date" value={newTaskRecurringEnd} onChange={e => setNewTaskRecurringEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-sm outline-none" />
+                      </div>
+                      <div className="flex flex-col gap-2 mt-1">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                          <input type="checkbox" checked={newTaskShowOnWeek} onChange={e => setNewTaskShowOnWeek(e.target.checked)} className="appearance-none w-3.5 h-3.5 border-2 border-zinc-300 dark:border-zinc-600 rounded-sm checked:bg-brand-navy checked:border-brand-navy transition-all" /> Add to Weekly View
+                        </label>
+                        <label className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                          <input type="checkbox" checked={newTaskShowOnMonth} onChange={e => setNewTaskShowOnMonth(e.target.checked)} className="appearance-none w-3.5 h-3.5 border-2 border-zinc-300 dark:border-zinc-600 rounded-sm checked:bg-brand-navy checked:border-brand-navy transition-all" /> Add to Monthly View
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {/* Bell — Deadline Nudge (no due_date required) */}
                 <div className={cn(
@@ -3763,16 +4151,17 @@ export default function Home() {
         )}
       </AnimatePresence>
       {/* Floating Add Button */}
-      <button onClick={() => setIsModalOpen(true)} className="fixed bottom-8 right-8 w-14 h-14 bg-brand-navy text-white rounded-full shadow-2xl hover:bg-brand-navy/90 hover:scale-105 active:scale-95 transition-all flex items-center justify-center z-40 group">
+      <button onClick={() => setIsModalOpen(true)} className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl flex items-center justify-center z-[250] hover:scale-105 active:scale-95 transition-transform group">
         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
       </button>
 
       {/* Main App */}
       <main className="flex w-full max-w-5xl flex-col bg-white shadow-2xl dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl relative z-10 transition-transform duration-300 my-auto">
 
-        {/* Navigation Bar */}
-        <div className="flex items-center justify-between px-6 py-4 sticky top-0 z-[100] w-full bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 shadow-sm rounded-t-xl">
-          <div className="flex items-center gap-3">
+        {/* Navigation Wrapper */}
+        <div className="sticky top-0 z-[50] w-full bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 shadow-sm rounded-t-xl">
+          <div className="flex flex-wrap md:flex-nowrap items-center justify-between px-4 sm:px-6 py-4 gap-y-3">
+            <div className="flex items-center gap-3">
             <button onClick={handleGoToToday} className={cn("flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-navy dark:text-zinc-300 bg-brand-navy/5 hover:bg-brand-navy/10 dark:bg-zinc-900 dark:hover:bg-zinc-800 rounded-full transition-colors", isPulsingToday && "animate-pulse ring-4 ring-brand-navy/30 dark:ring-brand-sage/30")}>
               <CalendarDays className="w-4 h-4" /> Today
             </button>
@@ -3817,7 +4206,26 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Header */}
+        {/* Mobile Tab Bar */}
+        <div className="md:hidden flex overflow-x-auto whitespace-nowrap px-4 pb-3 gap-2 custom-scrollbar no-scrollbar">
+          {['priorities', 'todos', 'goals', 'meals', 'health', 'notes'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveMobileTab(tab)}
+              className={cn(
+                "px-4 py-1.5 text-sm font-bold rounded-full transition-all capitalize whitespace-nowrap shrink-0",
+                activeMobileTab === tab 
+                  ? "bg-brand-navy text-white shadow-md ring-2 ring-brand-navy/30 dark:ring-brand-sage/30" 
+                  : "bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400"
+              )}
+            >
+              {tab === 'todos' ? "To Do's" : tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Header */}
         <div className="flex justify-between items-start border-b-2 border-brand-navy p-6 bg-zinc-50 dark:bg-zinc-900/50 box-border shrink-0">
           <div className="flex flex-col gap-1 z-10">
             <h1 className="text-3xl font-bold tracking-tight text-brand-navy dark:text-white">Stride Planner</h1>
@@ -3876,90 +4284,79 @@ export default function Home() {
         </div>
 
         {/* Main Columns */}
-        {viewMode === 'day' ? (
-          <>
-            {currentDate.getDay() === 0 && (
-              <div className="w-full bg-brand-sage/10 border-b-2 border-brand-sage/20 p-4 shrink-0 flex flex-col gap-2">
-                <h3 className="text-sm font-bold text-brand-sage uppercase tracking-widest flex items-center gap-2">
-                  <Star className="w-4 h-4" /> Weekly Goals Recap
-                </h3>
-                <div className="flex flex-wrap gap-4">
-                  {[0, 1, 2].map(idx => {
-                    const goal = (weeklyGoals[weekDateKeys[0]] || [])[idx];
-                    const hits = (weeklyGoalHits[weekDateKeys[0]] || [])[idx] || 0;
-                    if (!goal) return null;
-                    return (
-                      <div key={`recap-${idx}`} className="flex items-center gap-2 bg-white/70 dark:bg-zinc-900/70 rounded-lg px-3 py-2 border border-brand-sage/20 shadow-sm">
-                        <div className={cn("w-3 h-3 rounded-full shrink-0", hits > 0 ? "bg-brand-sage shadow-[0_0_8px_rgba(156,159,132,0.8)]" : "bg-zinc-300 dark:bg-zinc-700")} />
-                        <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{goal}</span>
-                        <span className="text-xs font-bold text-brand-sage bg-brand-sage/20 px-1.5 py-0.5 rounded-md ml-2">{hits} hit{hits !== 1 ? 's' : ''}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col md:flex-row flex-1 shrink-0">
-
-          {/* Left Column */}
-          <div className={cn(
-            "flex-[1.2] border-r-2 border-zinc-200 dark:border-zinc-800 p-6 flex flex-col gap-4 transition-all duration-300",
-            migratedDate === dateKey && "ring-4 ring-brand-navy dark:ring-brand-navy/50 bg-brand-navy/5 scale-[1.02] z-30 shadow-[0_0_20px_rgba(0,0,128,0.2)] rounded-2xl border-transparent"
-          )}>
-            <div className="flex items-center justify-between mb-4">
+        {viewMode === 'day' ? (() => {
+          const todosSection = (
+            <div className="flex flex-col gap-4 flex-1">
+<div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-brand-navy uppercase tracking-wider border-b-2 border-brand-navy/20 pb-1 w-full shrink-0">To Do's:</h2>
             </div>
             <div className="flex flex-col gap-4 flex-1">
-              {tasksArray.map((task) => (
-                <div key={task.id} className={cn(
-                  "flex items-start gap-3 group border-b border-zinc-100 dark:border-zinc-800/50 pb-3 isolate rounded-md transition-all duration-300",
-                  archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
-                )}>
-                  <div className="relative flex items-center justify-center mt-0.5 shrink-0">
-                    <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
-                    <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                  </div>
-                  <div className="flex-1 flex flex-col min-w-0">
-                    <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => toggleDayTaskDone(task.id)}>{task.text}</span>
-                    {task.time && (
-                      <span className={cn(
-                        "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
-                        !task.is_done && isOverdue(task.time, dateKey)
-                          ? "text-red-400 animate-pulse-opacity"
-                          : !task.is_done && isApproaching(task.time, dateKey)
-                          ? "text-amber-400 animate-pulse-opacity"
-                          : "text-zinc-400"
-                      )}>
-                        <Clock className="w-3 h-3" />{task.time}
-                      </span>
-                    )}
-                    {/* Confirmation tooltip — early/manual archive prompt */}
-                    {archiveConfirmId === task.id && (
-                      <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
-                        <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
-                        <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
-                      </div>
-                    )}
-                  </div>
-                  {renderTagDot(task.tag_id)}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
-                    {taskBank.some(t => t.id === task.master_id) && (
-                      <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
-                        <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
-                      </button>
-                    )}
-                    <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
-                  </div>
-                </div>
-              ))}
-              {Array.from({ length: Math.max(0, 9 - tasksArray.length) }).map((_, i) => (
-                <div key={`empty-todo-${i}`} className="border-b border-zinc-200 dark:border-zinc-800/50 h-10 w-full" />
-              ))}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleTodoDragEnd(e, dateKey)}>
+                <SortableContext items={todoRenderSlots.map((t, i) => t ? t.id : `empty-todo-slot-${i}`)} strategy={verticalListSortingStrategy}>
+                  {todoRenderSlots.map((task, i) => {
+                    if (task) {
+                      return (
+                        <SortableListItem key={task.id} id={task.id} className={cn(
+                          "flex items-start gap-3 group border-b border-zinc-100 dark:border-zinc-800/50 pb-3 isolate rounded-md transition-all duration-300 bg-transparent cursor-pointer",
+                          archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
+                        )}>
+                          <div className="relative flex items-center justify-center mt-0.5 shrink-0">
+                            <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
+                            <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          </div>
+                          <div className="flex-1 flex flex-col min-w-0">
+                            <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                            {task.time && (
+                              <span className={cn(
+                                "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
+                                !task.is_done && isOverdue(task.time, dateKey)
+                                  ? "text-red-400 animate-pulse-opacity"
+                                  : !task.is_done && isApproaching(task.time, dateKey)
+                                  ? "text-amber-400 animate-pulse-opacity"
+                                  : "text-zinc-400"
+                              )}>
+                                <Clock className="w-3 h-3" />{task.time}
+                              </span>
+                            )}
+                            {/* Confirmation tooltip — early/manual archive prompt */}
+                            {archiveConfirmId === task.id && (
+                              <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
+                                <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
+                                <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                              </div>
+                            )}
+                          </div>
+                          {renderTagDot(task.tag_id)}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
+                            {taskBank.some(t => t.id === task.master_id) && (
+                              <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
+                                <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
+                              </button>
+                            )}
+                            <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                          </div>
+                        </SortableListItem>
+                      );
+                    } else {
+                      return (
+                        <SortableListItem key={`empty-todo-slot-${i}`} id={`empty-todo-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="border-b border-zinc-200 dark:border-zinc-800/50 h-10 w-full bg-transparent cursor-pointer">
+                          <div className="w-full h-full"></div>
+                        </SortableListItem>
+                      );
+                    }
+                  })}
+                </SortableContext>
+              </DndContext>
             </div>
+            </div>
+          );
+          
+          const mealsSection = (
+<>
 
-            {/* Meals */}
+{/* Meals */}
             {(() => {
               const currentDateObj = new Date(currentDate);
               const isToday = dateKey === getDateKey(new Date());
@@ -4015,12 +4412,14 @@ export default function Home() {
                 </div>
               );
             })()}
-          </div>
 
-          {/* Right Column */}
-          <div className="flex-1 flex flex-col border-none">
+</>
+          );
+          
+          const prioritiesSection = (
+<>
 
-            {/* Priorities */}
+{/* Priorities */}
             <div className="p-6 border-b-2 border-zinc-200 dark:border-zinc-800">
               <h2 className="text-lg font-bold text-brand-sage uppercase tracking-wider mb-4 flex items-center justify-between">
                 Priorities:
@@ -4033,14 +4432,13 @@ export default function Home() {
                   onDragEnd={(e) => handlePriorityDragEnd(e, dateKey)}
                 >
                   <SortableContext 
-                    items={Array.from({ length: 5 }).map((_, i) => prioritiesArray[i]?.id || `empty-slot-${i}`)} 
+                    items={priorityRenderSlots.map((t, i) => t ? t.id : `empty-slot-${i}`)} 
                     strategy={verticalListSortingStrategy}
                   >
-                    {Array.from({ length: 5 }).map((_, i) => {
-                      const task = prioritiesArray[i];
+                    {priorityRenderSlots.map((task, i) => {
                       if (task) {
                         return (
-                          <SortablePriorityItem key={task.id} id={task.id} className={cn(
+                          <SortableListItem key={task.id} id={task.id} className={cn(
                             "flex items-center gap-3 group border-b border-zinc-200 dark:border-zinc-800 py-3 isolate rounded-md transition-colors duration-300 bg-transparent",
                             archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                           )}>
@@ -4052,7 +4450,7 @@ export default function Home() {
                               <span className="font-mono text-lg font-bold text-brand-sage/60 w-6 shrink-0 text-center">{i + 1}</span>
                             </div>
                             <div className="flex-1 flex flex-col cursor-pointer overflow-hidden min-w-0">
-                              <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => toggleDayTaskDone(task.id)}>{task.text}</span>
+                              <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
                               {task.time && (
                                 <span className={cn(
                                   "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
@@ -4083,17 +4481,17 @@ export default function Home() {
                               )}
                               <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                             </div>
-                          </SortablePriorityItem>
+                          </SortableListItem>
                         );
                       } else {
                         return (
-                          <SortablePriorityItem key={`empty-slot-${i}`} id={`empty-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 py-3 bg-transparent">
+                          <SortableListItem key={`empty-slot-${i}`} id={`empty-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 py-3 bg-transparent">
                             <div className="flex items-center gap-2 shrink-0">
                               <div className="w-5 h-5 border-2 border-brand-sage/10 rounded-full shrink-0"></div>
                               <span className="font-mono text-lg font-bold text-brand-sage/30 w-6 shrink-0 text-center">{i + 1}</span>
                             </div>
                             <div className="flex-1"></div>
-                          </SortablePriorityItem>
+                          </SortableListItem>
                         );
                       }
                     })}
@@ -4102,7 +4500,13 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Goals */}
+</>
+          );
+          
+          const goalsSection = (
+<>
+
+{/* Goals */}
             <div className="p-6 flex-1 flex flex-col gap-2 min-h-[300px]">
               <h3 className="text-md font-bold text-zinc-600 dark:text-zinc-400 italic mb-2 border-b border-zinc-200 dark:border-zinc-800/50 pb-2 flex justify-between uppercase tracking-wider">
                 Goals: <Tag className="w-4 h-4 text-zinc-300" />
@@ -4163,27 +4567,40 @@ export default function Home() {
               </form>
 
               <div className="flex flex-col gap-3">
-                {goalsArray.length === 0 ? (
-                  <div className="text-sm text-zinc-400 italic">No tasks tagged as Goals today.</div>
-                ) : (
-                  goalsArray.map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 group isolate">
-                      <div className="relative flex items-center justify-center shrink-0">
-                        <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-zinc-400 checked:border-zinc-400 transition-all cursor-pointer" />
-                        <svg className="absolute w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                      </div>
-                      <span className={cn("text-base transition-all flex-1 cursor-pointer", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => toggleDayTaskDone(task.id)}>{task.text}</span>
-                      <button onClick={() => removeDayTask(task.id, task.master_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-all"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
-                    </div>
-                  ))
-                )}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGoalDragEnd(e, dateKey)}>
+                  <SortableContext items={goalRenderSlots.map((t, i) => t ? t.id : `empty-goal-slot-${i}`)} strategy={verticalListSortingStrategy}>
+                    {goalRenderSlots.map((task, i) => {
+                      if (task) {
+                        return (
+                          <SortableListItem key={task.id} id={task.id} className="flex items-center gap-3 group isolate cursor-pointer bg-transparent">
+                            <div className="relative flex items-center justify-center shrink-0">
+                              <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-zinc-400 checked:border-zinc-400 transition-all cursor-pointer" />
+                              <svg className="absolute w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                            <span className={cn("text-base transition-all flex-1 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                            <button onClick={() => removeDayTask(task.id, task.master_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-all"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                          </SortableListItem>
+                        );
+                      } else {
+                        return (
+                          <SortableListItem key={`empty-goal-slot-${i}`} id={`empty-goal-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="border-b border-zinc-200 dark:border-zinc-800/50 h-8 w-full mt-2 bg-transparent cursor-pointer">
+                            <div className="w-full h-full"></div>
+                          </SortableListItem>
+                        );
+                      }
+                    })}
+                  </SortableContext>
+                </DndContext>
               </div>
-              {Array.from({ length: Math.max(0, 5 - goalsArray.length) }).map((_, i) => (
-                <div key={`empty-goal-${i}`} className="border-b border-zinc-200 dark:border-zinc-800/50 h-8 w-full mt-2" />
-              ))}
             </div>
 
-            {/* Health & Habits */}
+</>
+          );
+          
+          const healthSection = (
+<>
+
+{/* Health & Habits */}
             <div className="p-6 border-t-2 border-zinc-200 dark:border-zinc-800 flex flex-col gap-4">
               <h3 className="text-md font-bold text-zinc-600 dark:text-zinc-400 italic mb-2 uppercase tracking-wider">Health & Habits:</h3>
               <div className="flex flex-col gap-5">
@@ -4269,10 +4686,14 @@ export default function Home() {
 
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="border-t-4 border-brand-navy flex flex-col bg-zinc-50 dark:bg-zinc-900/30 shrink-0">
+</>
+          );
+          
+          const notesSection = (
+<>
+
+<div className="border-t-4 border-brand-navy flex flex-col bg-zinc-50 dark:bg-zinc-900/30 shrink-0">
           <div className="flex flex-col flex-1">
             <div className="p-6 pb-2 border-b-2 border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900 group">
               <h2 className="text-md font-bold text-brand-navy uppercase tracking-widest flex items-center gap-2">
@@ -4300,8 +4721,83 @@ export default function Home() {
             />
           </div>
         </div>
-          </>
-        ) : viewMode === 'week' ? (
+
+</>
+          );
+          
+          const mobileTabs = ['priorities', 'todos', 'goals', 'meals', 'health', 'notes'];
+          const activeIdx = mobileTabs.indexOf(activeMobileTab);
+          
+          return (
+            <>
+              {currentDate.getDay() === 0 && (
+                <div className="w-full bg-brand-sage/10 border-b-2 border-brand-sage/20 p-4 shrink-0 flex flex-col gap-2">
+                  <h3 className="text-sm font-bold text-brand-sage uppercase tracking-widest flex items-center gap-2">
+                    <Star className="w-4 h-4" /> Weekly Goals Recap
+                  </h3>
+                  <div className="flex flex-wrap gap-4">
+                    {[0, 1, 2].map(idx => {
+                      const goal = (weeklyGoals[weekDateKeys[0]] || [])[idx];
+                      const hits = (weeklyGoalHits[weekDateKeys[0]] || [])[idx] || 0;
+                      if (!goal) return null;
+                      return (
+                        <div key={`recap-${idx}`} className="flex items-center gap-2 bg-white/70 dark:bg-zinc-900/70 rounded-lg px-3 py-2 border border-brand-sage/20 shadow-sm">
+                          <div className={cn("w-3 h-3 rounded-full shrink-0", hits > 0 ? "bg-brand-sage shadow-[0_0_8px_rgba(156,159,132,0.8)]" : "bg-zinc-300 dark:bg-zinc-700")} />
+                          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{goal}</span>
+                          <span className="text-xs font-bold text-brand-sage bg-brand-sage/20 px-1.5 py-0.5 rounded-md ml-2">{hits} hit{hits !== 1 ? 's' : ''}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {isMobile ? (
+                <div className="flex flex-col flex-1 shrink-0 overflow-hidden relative touch-pan-y" style={{ height: 'calc(100vh - 180px)' }}>
+                  <motion.div
+                    className="flex w-[600%] h-full items-start"
+                    animate={{ x: `-${activeIdx * (100 / 6)}%` }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    onDragEnd={(e, { offset, velocity }) => {
+                      const swipe = Math.abs(offset.x) * velocity.x;
+                      if (swipe < -10000 && activeIdx < mobileTabs.length - 1) setActiveMobileTab(mobileTabs[activeIdx + 1]);
+                      else if (swipe > 10000 && activeIdx > 0) setActiveMobileTab(mobileTabs[activeIdx - 1]);
+                      else if (offset.x < -50 && activeIdx < mobileTabs.length - 1) setActiveMobileTab(mobileTabs[activeIdx + 1]);
+                      else if (offset.x > 50 && activeIdx > 0) setActiveMobileTab(mobileTabs[activeIdx - 1]);
+                    }}
+                  >
+                    <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden">{prioritiesSection}</div>
+                    <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden p-6">{todosSection}</div>
+                    <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden">{goalsSection}</div>
+                    <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden p-6">{mealsSection}</div>
+                    <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden">{healthSection}</div>
+                    <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden">{notesSection}</div>
+                  </motion.div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col md:flex-row flex-1 shrink-0">
+                    <div className={cn(
+                      "flex-[1.2] border-r-2 border-zinc-200 dark:border-zinc-800 p-6 flex flex-col gap-4 transition-all duration-300",
+                      migratedDate === dateKey && "ring-4 ring-brand-navy dark:ring-brand-navy/50 bg-brand-navy/5 scale-[1.02] z-30 shadow-[0_0_20px_rgba(0,0,128,0.2)] rounded-2xl border-transparent"
+                    )}>
+                      {todosSection}
+                      {mealsSection}
+                    </div>
+                    <div className="flex-1 flex flex-col border-none">
+                      {prioritiesSection}
+                      {goalsSection}
+                      {healthSection}
+                    </div>
+                  </div>
+                  {notesSection}
+                </>
+              )}
+            </>
+          );
+        })() : viewMode === 'week' ? (
           <div className="flex w-full h-full flex-1 overflow-y-auto overflow-x-hidden p-6 gap-6 pb-12 flex-col items-start bg-zinc-100/50 dark:bg-zinc-950/20 mt-4 custom-scrollbar">
             <div className="w-full shrink-0 -mb-2 px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-2xl font-black text-brand-navy dark:text-brand-sage tracking-tight flex items-center gap-2">
@@ -4573,7 +5069,20 @@ export default function Home() {
                           const isToday = mKey === getDateKey(new Date());
                           
                           const storedDay = dataStore[mKey] || { items: [], meals: [], completedSteps: 0, waterOunces: 0, notesText: "" };
-                          const dayItems: TaskItem[] = storedDay.items.filter(i => (i as any).isGhost !== true);
+                          let dayItems: TaskItem[] = storedDay.items.filter(i => (i as any).isGhost !== true);
+                          const mActiveDate = new Date(mKey + 'T00:00:00');
+                          const dow = mActiveDate.getDay();
+                          recurringTasks.forEach(rt => {
+                            if (rt.showOnMonth && rt.daysOfWeek.includes(dow)) {
+                              if (rt.endDate && mActiveDate > new Date(rt.endDate + 'T00:00:00')) return;
+                              if (dayItems.some(i => i.master_id === rt.id)) return;
+                              const compositeKey = `recur_${rt.id}_${mKey}`;
+                              dayItems.push({
+                                id: compositeKey, master_id: rt.id, text: rt.text, is_done: !!completedRoutines[compositeKey],
+                                is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
+                              } as any);
+                            }
+                          });
                           const dayPriorities = dayItems.filter(i => i.is_priority);
                           
                           const totalPri = dayPriorities.length;
@@ -4717,8 +5226,10 @@ export default function Home() {
                                  <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                </div>
                                <div className="flex-1 flex items-center min-w-0 pr-8">
-                                  <div className="flex items-center gap-2 mt-0.5">
+                                  <div className="flex items-center gap-2 mt-0.5 shrink-0">
                                     {renderTagDot(task.tag_id)}
+                                    {(task.is_goal || task.tag_id === goalsTagId) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
+                                    {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
                                   </div>
                                   <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
                                     {task.text}
