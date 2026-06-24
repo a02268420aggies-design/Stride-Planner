@@ -1,0 +1,55 @@
+      <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar task-swipe-row" onPointerDownCapture={(e) => e.stopPropagation()}>
+        <div className="w-full shrink-0 snap-center flex flex-col gap-3 p-4 relative">
+          <div className="flex items-start gap-3">
+            <button onClick={() => setLocalPriority(!localPriority)} className={cn("focus:outline-none shrink-0 mt-0.5 transition-opacity", !localPriority && "opacity-0 group-hover:opacity-100")}>
+              <Star className={cn("w-5 h-5 transition-colors", localPriority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700 hover:text-brand-sage/50")} />
+            </button>
+            <div className="flex-1 flex flex-col gap-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span onClick={() => setEditingTask(task)} className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer rounded px-1 transition-colors">{task.text}</span>
+                {(task.dueDate || task.due_date) && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const dDate = task.dueDate || task.due_date;
+                      if (dDate) {
+                        setCurrentDate(new Date(dDate + 'T00:00:00'));
+                        setViewMode('day');
+                        if (closeTaskBank) closeTaskBank();
+                      }
+                    }}
+                    className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold tracking-wider rounded border border-slate-200 dark:border-slate-700 hover:opacity-80 transition-opacity cursor-pointer shrink-0"
+                    title="Jump to Due Date"
+                  >
+                    DUE {formatBufferLabel(task.dueDate || task.due_date)}
+                  </button>
+                )}
+              </div>
+              {(task.nudgeDate || (task.isReminderActive && task.reminderTime)) && (
+                <span className={cn(
+                  "flex items-center gap-1 text-[11px] font-medium font-mono mt-0.5",
+                  nudgeOverdue ? "text-amber-500" : nudgeApproaching ? "text-amber-400" : "text-brand-sage"
+                )}>
+                  <Bell className="w-3 h-3" />
+                  {task.nudgeDate ? `Nudge: ${new Date(task.nudgeDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : new Date(task.reminderTime!).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
+            {hasNudge && (
+              <Bell className={cn("w-4 h-4 shrink-0 mt-0.5 animate-pulse", nudgeOverdue ? "text-amber-500 fill-amber-400" : "text-amber-400")} />
+            )}
+          </div>
+          <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            {schedulingState === 'success' ? (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-sage text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Scheduled
+              </button>
+            ) : schedulingState === 'error' ? (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
+                <X className="w-3.5 h-3.5 shrink-0" /> Already Scheduled
+              </button>
+            ) : hasNudge ? (
+              <button onClick={() => handleScheduleTask(task, viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? selectedWeekDate : dateKey) : (viewMode === 'month' && isPeekOpen && peekDate) ? peekDate : (viewMode === 'month' && isMonthlyBufferExpanded) ? `MONTH_BUFFER_${currentMonthKey}` : dateKey, localPriority)} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white hover:bg-amber-600 text-xs font-bold rounded-md transition-colors shadow-sm">
+                <ArrowRightToLine className="w-3.5 h-3.5" /> {(viewMode === 'month' && isPeekOpen && peekDate) ? `Quick Add to ${parseInt((peekDate || "").split('-')[2] || "0", 10)}` : (viewMode === 'month' && isMonthlyBufferExpanded) ? "Quick Add to Buffer" : "Quick Add Today"}
+              </button>
+            ) : (
