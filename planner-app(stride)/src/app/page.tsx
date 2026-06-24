@@ -624,11 +624,13 @@ export default function Home() {
   const [hasMounted, setHasMounted] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState('priorities');
   const [isMobile, setIsMobile] = useState(false);
+  const [hasTouch, setHasTouch] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     handleResize();
     window.addEventListener('resize', handleResize);
+    setHasTouch(window.matchMedia('(hover: none)').matches);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const sensors = useSensors(
