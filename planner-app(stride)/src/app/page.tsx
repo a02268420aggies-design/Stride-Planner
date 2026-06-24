@@ -274,7 +274,7 @@ const TaskBankCard = ({
 
   return (
     <div className={cn(
-        "group relative flex flex-col gap-3 p-4 bg-white border dark:bg-zinc-900/50 rounded-xl hover:shadow-md transition-all cursor-grab active:cursor-grabbing",
+        "group relative bg-white border dark:bg-zinc-900/50 rounded-xl hover:shadow-md transition-all cursor-grab active:cursor-grabbing overflow-hidden",
       schedulingState === 'success' ? "border-brand-sage bg-brand-sage/10 scale-95 opacity-60 duration-300" :
       schedulingState === 'error' ? "border-red-500 shadow-[0_0_12px_2px_rgba(239,68,68,0.3)] animate-pulse-opacity" :
       nudgeOverdue
@@ -285,206 +285,240 @@ const TaskBankCard = ({
     )}
     style={pulseColor ? { boxShadow: `0 0 15px 2px ${pulseColor}40`, borderColor: pulseColor } : {}}
     >
-      <div className="flex items-start gap-3">
-        <button onClick={() => setLocalPriority(!localPriority)} className={cn("focus:outline-none shrink-0 mt-0.5 transition-opacity", !localPriority && "opacity-0 group-hover:opacity-100")}>
-          <Star className={cn("w-5 h-5 transition-colors", localPriority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700 hover:text-brand-sage/50")} />
-        </button>
-        <div className="flex-1 flex flex-col gap-0.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span onClick={() => setEditingTask(task)} className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer rounded px-1 transition-colors">{task.text}</span>
-            {(task.dueDate || task.due_date) && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const dDate = task.dueDate || task.due_date;
-                  if (dDate) {
-                    setCurrentDate(new Date(dDate + 'T00:00:00'));
-                    setViewMode('day');
-                    if (closeTaskBank) closeTaskBank();
-                  }
-                }}
-                className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold tracking-wider rounded border border-slate-200 dark:border-slate-700 hover:opacity-80 transition-opacity cursor-pointer shrink-0"
-                title="Jump to Due Date"
-              >
-                DUE {formatBufferLabel(task.dueDate || task.due_date)}
-              </button>
+      <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar">
+        <div className="w-full shrink-0 snap-center flex flex-col gap-3 p-4 relative">
+          <div className="flex items-start gap-3">
+            <button onClick={() => setLocalPriority(!localPriority)} className={cn("focus:outline-none shrink-0 mt-0.5 transition-opacity", !localPriority && "opacity-0 group-hover:opacity-100")}>
+              <Star className={cn("w-5 h-5 transition-colors", localPriority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700 hover:text-brand-sage/50")} />
+            </button>
+            <div className="flex-1 flex flex-col gap-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span onClick={() => setEditingTask(task)} className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer rounded px-1 transition-colors">{task.text}</span>
+                {(task.dueDate || task.due_date) && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const dDate = task.dueDate || task.due_date;
+                      if (dDate) {
+                        setCurrentDate(new Date(dDate + 'T00:00:00'));
+                        setViewMode('day');
+                        if (closeTaskBank) closeTaskBank();
+                      }
+                    }}
+                    className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold tracking-wider rounded border border-slate-200 dark:border-slate-700 hover:opacity-80 transition-opacity cursor-pointer shrink-0"
+                    title="Jump to Due Date"
+                  >
+                    DUE {formatBufferLabel(task.dueDate || task.due_date)}
+                  </button>
+                )}
+              </div>
+              {(task.nudgeDate || (task.isReminderActive && task.reminderTime)) && (
+                <span className={cn(
+                  "flex items-center gap-1 text-[11px] font-medium font-mono mt-0.5",
+                  nudgeOverdue ? "text-amber-500" : nudgeApproaching ? "text-amber-400" : "text-brand-sage"
+                )}>
+                  <Bell className="w-3 h-3" />
+                  {task.nudgeDate ? `Nudge: ${new Date(task.nudgeDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : new Date(task.reminderTime!).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
+            {hasNudge && (
+              <Bell className={cn("w-4 h-4 shrink-0 mt-0.5 animate-pulse", nudgeOverdue ? "text-amber-500 fill-amber-400" : "text-amber-400")} />
             )}
           </div>
-          {(task.nudgeDate || (task.isReminderActive && task.reminderTime)) && (
-            <span className={cn(
-              "flex items-center gap-1 text-[11px] font-medium font-mono mt-0.5",
-              nudgeOverdue ? "text-amber-500" : nudgeApproaching ? "text-amber-400" : "text-brand-sage"
-            )}>
-              <Bell className="w-3 h-3" />
-              {task.nudgeDate ? `Nudge: ${new Date(task.nudgeDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : new Date(task.reminderTime!).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
+          <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            {schedulingState === 'success' ? (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-sage text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Scheduled
+              </button>
+            ) : schedulingState === 'error' ? (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
+                <X className="w-3.5 h-3.5 shrink-0" /> Already Scheduled
+              </button>
+            ) : hasNudge ? (
+              <button onClick={() => handleScheduleTask(task, viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? selectedWeekDate : dateKey) : (viewMode === 'month' && isPeekOpen && peekDate) ? peekDate : (viewMode === 'month' && isMonthlyBufferExpanded) ? `MONTH_BUFFER_${currentMonthKey}` : dateKey, localPriority)} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white hover:bg-amber-600 text-xs font-bold rounded-md transition-colors shadow-sm">
+                <ArrowRightToLine className="w-3.5 h-3.5" /> {(viewMode === 'month' && isPeekOpen && peekDate) ? `Quick Add to ${parseInt((peekDate || "").split('-')[2] || "0", 10)}` : (viewMode === 'month' && isMonthlyBufferExpanded) ? "Quick Add to Buffer" : "Quick Add Today"}
+              </button>
+            ) : (
+              <button onClick={() => handleScheduleTask(task, viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? selectedWeekDate : "BUFFER") : (viewMode === 'month' && isPeekOpen && peekDate) ? peekDate : (viewMode === 'month' && isMonthlyBufferExpanded) ? `MONTH_BUFFER_${currentMonthKey}` : dateKey, localPriority)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/20 dark:text-brand-navy hover:bg-brand-navy hover:text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
+                <ArrowRightToLine className="w-3.5 h-3.5 shrink-0" /> {(viewMode === 'month' && isPeekOpen && peekDate) ? `Plan for ${parseInt((peekDate || "").split('-')[2] || "0", 10)}` : (viewMode === 'month' && isMonthlyBufferExpanded) ? "Add to Buffer" : `Plan for ${viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? new Date(selectedWeekDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' }) : "Buffer") : "Today"}`}
+              </button>
+            )}
+            {/* Empty space for desktop tray overlay */}
+            <div className="w-8"></div>
+          </div>
         </div>
-        {hasNudge && (
-          <Bell className={cn("w-4 h-4 shrink-0 mt-0.5 animate-pulse", nudgeOverdue ? "text-amber-500 fill-amber-400" : "text-amber-400")} />
-        )}
+
+        {/* Mobile Swipe Action Tray */}
+        <div className="shrink-0 snap-end flex md:hidden items-stretch bg-zinc-50 dark:bg-zinc-800/50 border-l border-zinc-200 dark:border-zinc-700/50">
+           <button onClick={() => setEditingTask(task)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+           <button onClick={() => setLocalPriority(!localPriority)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Toggle Priority"><Star className={cn("w-5 h-5", localPriority && "text-brand-sage fill-brand-sage")} /></button>
+           <button onClick={(e) => { 
+             const rect = e.currentTarget.getBoundingClientRect();
+             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
+             setActiveTagDropdownId(activeTagDropdownId === task.id ? null : task.id); 
+             setActiveNudgeDropdownId(null); 
+           }} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50 popover-container" title="Tag Task"><Tag className="w-5 h-5" style={task.tag_id ? { color: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8', fill: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8' } : {}} /></button>
+           <button onClick={(e) => { 
+             const rect = e.currentTarget.getBoundingClientRect();
+             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
+             setActiveNudgeDropdownId(activeNudgeDropdownId === task.id ? null : task.id); 
+             setActiveTagDropdownId(null); 
+           }} className={cn("px-5 flex items-center justify-center transition-colors border-r border-zinc-200 dark:border-zinc-700/50 popover-container", task.nudgeDate || (task.isReminderActive && task.reminderTime) ? "text-brand-sage hover:text-brand-navy bg-brand-sage/10 dark:hover:text-brand-sage/80" : "text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10")} title="Nudge Task"><Bell className="w-5 h-5" /></button>
+           <button onClick={() => archiveMasterTask(task.id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
+           <button onClick={() => setTaskBank((prev: any) => prev.filter((t: any) => t.id !== task.id))} className="px-5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+        </div>
       </div>
-      <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-        {schedulingState === 'success' ? (
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-sage text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Scheduled
-          </button>
-        ) : schedulingState === 'error' ? (
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
-            <X className="w-3.5 h-3.5 shrink-0" /> Already Scheduled
-          </button>
-        ) : hasNudge ? (
-          <button onClick={() => handleScheduleTask(task, viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? selectedWeekDate : dateKey) : (viewMode === 'month' && isPeekOpen && peekDate) ? peekDate : (viewMode === 'month' && isMonthlyBufferExpanded) ? `MONTH_BUFFER_${currentMonthKey}` : dateKey, localPriority)} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white hover:bg-amber-600 text-xs font-bold rounded-md transition-colors shadow-sm">
-            <ArrowRightToLine className="w-3.5 h-3.5" /> {(viewMode === 'month' && isPeekOpen && peekDate) ? `Quick Add to ${parseInt((peekDate || "").split('-')[2] || "0", 10)}` : (viewMode === 'month' && isMonthlyBufferExpanded) ? "Quick Add to Buffer" : "Quick Add Today"}
-          </button>
-        ) : (
-          <button onClick={() => handleScheduleTask(task, viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? selectedWeekDate : "BUFFER") : (viewMode === 'month' && isPeekOpen && peekDate) ? peekDate : (viewMode === 'month' && isMonthlyBufferExpanded) ? `MONTH_BUFFER_${currentMonthKey}` : dateKey, localPriority)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/20 dark:text-brand-navy hover:bg-brand-navy hover:text-white text-xs font-bold rounded-md transition-colors shadow-sm whitespace-nowrap">
-            <ArrowRightToLine className="w-3.5 h-3.5 shrink-0" /> {(viewMode === 'month' && isPeekOpen && peekDate) ? `Plan for ${parseInt((peekDate || "").split('-')[2] || "0", 10)}` : (viewMode === 'month' && isMonthlyBufferExpanded) ? "Add to Buffer" : `Plan for ${viewMode === 'week' ? (selectedWeekDate !== "BUFFER" ? new Date(selectedWeekDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' }) : "Buffer") : "Today"}`}
-          </button>
-        )}
-        <div className="flex items-center gap-1 relative opacity-0 group-hover:opacity-100 transition-opacity">
-          <button 
-            onClick={(e) => { 
-              const rect = e.currentTarget.getBoundingClientRect();
-              setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
-              setActiveTagDropdownId(activeTagDropdownId === task.id ? null : task.id); 
-              setActiveNudgeDropdownId(null); 
-            }} 
-            className="flex items-center justify-center p-1.5 rounded-md transition-colors hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10 text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage popover-container" title="Tag Task">
-            <Tag className="w-4 h-4" style={task.tag_id ? { color: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8', fill: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8' } : {}} />
-          </button>
-          {activeTagDropdownId === task.id && typeof document !== 'undefined' && createPortal(
-            <div 
-              style={{ position: 'fixed', top: popoverCoords.top < window.innerHeight / 2 ? popoverCoords.bottom + 5 : undefined, bottom: popoverCoords.top >= window.innerHeight / 2 ? window.innerHeight - popoverCoords.top + 5 : undefined, right: popoverCoords.right }} 
-              className="w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-[0_0_20px_rgba(0,0,0,0.15)] dark:shadow-[0_0_20px_rgba(0,0,0,0.4)] rounded-xl p-2 z-[200] animate-in zoom-in-95 duration-100 flex flex-col gap-2 popover-container"
-            >
-               <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
-                 {tags.map((t: any) => (
-                   <button 
-                     key={t.id}
-                     onClick={() => handleTagUpdate(t.id)}
-                     className="w-full flex items-center gap-2 text-left px-2 py-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors"
-                   >
-                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-                     <span className="truncate">{t.name}</span>
-                   </button>
-                 ))}
-                 {task.tag_id && (
-                   <button 
-                     onClick={() => handleTagUpdate(null)}
-                     className="w-full text-left px-2 py-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors mt-1 border-t border-zinc-100 dark:border-zinc-700/50"
-                   >
-                     Clear Tag
-                   </button>
-                 )}
-               </div>
-               <div className="border-t border-zinc-100 dark:border-zinc-700 pt-2 flex flex-col gap-2">
-                 <input 
-                   type="text" 
-                   placeholder="New Tag Name" 
-                   value={newTagName}
-                   onChange={e => setNewTagName(e.target.value)}
-                   className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs outline-none focus:border-brand-navy/50"
+
+      {/* Desktop Hover Action Tray */}
+      <div className="hidden md:flex absolute right-4 bottom-3 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-md border border-zinc-100 dark:border-zinc-800 p-1 z-[100]">
+         <button onClick={() => setEditingTask(task)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
+         <button onClick={() => setLocalPriority(!localPriority)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Toggle Priority"><Star className={cn("w-4 h-4 text-zinc-400 hover:text-brand-sage", localPriority && "text-brand-sage fill-brand-sage")} /></button>
+         <button 
+           onClick={(e) => { 
+             const rect = e.currentTarget.getBoundingClientRect();
+             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
+             setActiveTagDropdownId(activeTagDropdownId === task.id ? null : task.id); 
+             setActiveNudgeDropdownId(null); 
+           }} 
+           className="flex items-center justify-center p-1.5 rounded-md transition-colors hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10 text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage popover-container" title="Tag Task">
+           <Tag className="w-4 h-4" style={task.tag_id ? { color: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8', fill: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8' } : {}} />
+         </button>
+         <button 
+           onClick={(e) => { 
+             const rect = e.currentTarget.getBoundingClientRect();
+             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
+             setActiveNudgeDropdownId(activeNudgeDropdownId === task.id ? null : task.id); 
+             setActiveTagDropdownId(null); 
+           }} 
+           className={cn("flex items-center justify-center p-1.5 rounded-md transition-colors popover-container", task.nudgeDate || (task.isReminderActive && task.reminderTime) ? "text-brand-sage hover:text-brand-navy bg-brand-sage/10 dark:hover:text-brand-sage/80" : "text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10")} title="Nudge Task">
+           <Bell className="w-4 h-4" />
+         </button>
+         <button onClick={() => archiveMasterTask(task.id)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task"><PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" /></button>
+         <button onClick={() => setTaskBank((prev: any) => prev.filter((t: any) => t.id !== task.id))} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors shrink-0" title="Delete"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+      </div>
+
+      {activeTagDropdownId === task.id && typeof document !== 'undefined' && createPortal(
+        <div 
+          style={{ position: 'fixed', top: popoverCoords.top < window.innerHeight / 2 ? popoverCoords.bottom + 5 : undefined, bottom: popoverCoords.top >= window.innerHeight / 2 ? window.innerHeight - popoverCoords.top + 5 : undefined, right: popoverCoords.right }} 
+          className="w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-[0_0_20px_rgba(0,0,0,0.15)] dark:shadow-[0_0_20px_rgba(0,0,0,0.4)] rounded-xl p-2 z-[200] animate-in zoom-in-95 duration-100 flex flex-col gap-2 popover-container"
+        >
+           <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+             {tags.map((t: any) => (
+               <button 
+                 key={t.id}
+                 onClick={() => handleTagUpdate(t.id)}
+                 className="w-full flex items-center gap-2 text-left px-2 py-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors"
+               >
+                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                 <span className="truncate">{t.name}</span>
+               </button>
+             ))}
+             {task.tag_id && (
+               <button 
+                 onClick={() => handleTagUpdate(null)}
+                 className="w-full text-left px-2 py-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors mt-1 border-t border-zinc-100 dark:border-zinc-700/50"
+               >
+                 Clear Tag
+               </button>
+             )}
+           </div>
+           <div className="border-t border-zinc-100 dark:border-zinc-700 pt-2 flex flex-col gap-2">
+             <input 
+               type="text" 
+               placeholder="New Tag Name" 
+               value={newTagName}
+               onChange={e => setNewTagName(e.target.value)}
+               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs outline-none focus:border-brand-navy/50"
+             />
+             <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+               {aestheticColors.map(c => (
+                 <button 
+                   key={c}
+                   onClick={() => {
+                     setNewTagColor(c);
+                     const existingName = findTagNameByColor(c, tags);
+                     if (existingName) setNewTagName(existingName);
+                     else setNewTagName("");
+                   }}
+                   className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", newTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
+                   style={{ backgroundColor: c }}
                  />
-                 <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
-                   {aestheticColors.map(c => (
-                     <button 
-                       key={c}
-                       onClick={() => {
-                         setNewTagColor(c);
-                         const existingName = findTagNameByColor(c, tags);
-                         if (existingName) setNewTagName(existingName);
-                         else setNewTagName("");
-                       }}
-                       className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", newTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
-                       style={{ backgroundColor: c }}
-                     />
-                   ))}
-                 </div>
-                 <button 
-                   onClick={() => {
-                     if (!newTagName.trim()) return;
-                     const newTag = { id: `tag_${Date.now()}`, name: newTagName.trim(), color: newTagColor };
-                     setTags((prev: any) => [...prev, newTag]);
-                     handleTagUpdate(newTag.id);
-                     setNewTagName("");
-                   }}
-                   disabled={!newTagName.trim()}
-                   className="w-full bg-brand-navy dark:bg-brand-sage text-white font-bold text-xs py-1.5 rounded-lg disabled:opacity-50 transition-colors"
-                 >
-                   Create & Apply
-                 </button>
-               </div>
-            </div>,
-            document.body
-          )}
-          <button 
-            onClick={(e) => { 
-              const rect = e.currentTarget.getBoundingClientRect();
-              setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
-              setActiveNudgeDropdownId(activeNudgeDropdownId === task.id ? null : task.id); 
-              setActiveTagDropdownId(null); 
-            }} 
-            className={cn("flex items-center justify-center p-1.5 rounded-md transition-colors popover-container", task.nudgeDate || (task.isReminderActive && task.reminderTime) ? "text-brand-sage hover:text-brand-navy bg-brand-sage/10 dark:hover:text-brand-sage/80" : "text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10")} title="Nudge Task">
-            <Bell className="w-4 h-4" />
-          </button>
-          {activeNudgeDropdownId === task.id && typeof document !== 'undefined' && createPortal(
-            <div 
-              style={{ position: 'fixed', top: popoverCoords.top < window.innerHeight / 2 ? popoverCoords.bottom + 5 : undefined, bottom: popoverCoords.top >= window.innerHeight / 2 ? window.innerHeight - popoverCoords.top + 5 : undefined, right: popoverCoords.right }} 
-              className="w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-[0_0_20px_rgba(0,0,0,0.15)] dark:shadow-[0_0_20px_rgba(0,0,0,0.4)] rounded-xl p-1 z-[200] animate-in zoom-in-95 duration-100 flex flex-col popover-container"
-            >
-               <button 
-                 onClick={() => {
-                   const d = new Date();
-                   d.setDate(d.getDate() + 1);
-                   d.setHours(9, 0, 0, 0);
-                   setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: d.toISOString() } : t));
-                   setActiveNudgeDropdownId(null);
-                 }}
-                 className="w-full text-left px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors border-b border-zinc-100 dark:border-zinc-700/50"
-               >
-                 Tomorrow Morning
-               </button>
-               <button 
-                 onClick={() => {
-                   const d = new Date();
-                   d.setDate(d.getDate() + 2);
-                   d.setHours(9, 0, 0, 0);
-                   setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: d.toISOString() } : t));
-                   setActiveNudgeDropdownId(null);
-                 }}
-                 className="w-full text-left px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors border-b border-zinc-100 dark:border-zinc-700/50"
-               >
-                 In 2 Days
-               </button>
-               <div className="px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 border-b border-zinc-100 dark:border-zinc-700/50 flex flex-col gap-1.5">
-                 <span className="opacity-70">Custom Date:</span>
-                 <input type="datetime-local" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-1 text-[11px] outline-none" onChange={(e) => {
-                   if (e.target.value) {
-                     setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: new Date(e.target.value).toISOString() } : t));
-                     setActiveNudgeDropdownId(null);
-                   }
-                 }} />
-               </div>
-               {(task.nudgeDate || (task.isReminderActive && task.reminderTime)) && (
-                 <button 
-                   onClick={() => {
-                     setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: undefined, isReminderActive: false, reminderTime: undefined } : t));
-                     setActiveNudgeDropdownId(null);
-                   }}
-                   className="w-full text-left px-3 py-2 text-xs font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors border-b border-zinc-100 dark:border-zinc-700/50"
-                 >
-                   Clear Nudge
-                 </button>
-               )}
-               <button onClick={() => archiveMasterTask(task.id)} className="w-full text-left px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors mt-0.5 flex items-center gap-2">
-                 <CheckCircle2 className="w-3.5 h-3.5" /> Archive Task
-               </button>
-             </div>,
-            document.body
-          )}
-        </div>
-      </div>
+               ))}
+             </div>
+             <button 
+               onClick={() => {
+                 if (!newTagName.trim()) return;
+                 const newTag = { id: `tag_${Date.now()}`, name: newTagName.trim(), color: newTagColor };
+                 setTags((prev: any) => [...prev, newTag]);
+                 handleTagUpdate(newTag.id);
+                 setNewTagName("");
+               }}
+               disabled={!newTagName.trim()}
+               className="w-full bg-brand-navy dark:bg-brand-sage text-white font-bold text-xs py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+             >
+               Create & Apply
+             </button>
+           </div>
+        </div>,
+        document.body
+      )}
+
+      {activeNudgeDropdownId === task.id && typeof document !== 'undefined' && createPortal(
+        <div 
+          style={{ position: 'fixed', top: popoverCoords.top < window.innerHeight / 2 ? popoverCoords.bottom + 5 : undefined, bottom: popoverCoords.top >= window.innerHeight / 2 ? window.innerHeight - popoverCoords.top + 5 : undefined, right: popoverCoords.right }} 
+          className="w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-[0_0_20px_rgba(0,0,0,0.15)] dark:shadow-[0_0_20px_rgba(0,0,0,0.4)] rounded-xl p-1 z-[200] animate-in zoom-in-95 duration-100 flex flex-col popover-container"
+        >
+           <button 
+             onClick={() => {
+               const d = new Date();
+               d.setDate(d.getDate() + 1);
+               d.setHours(9, 0, 0, 0);
+               setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: d.toISOString() } : t));
+               setActiveNudgeDropdownId(null);
+             }}
+             className="w-full text-left px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors border-b border-zinc-100 dark:border-zinc-700/50"
+           >
+             Tomorrow Morning
+           </button>
+           <button 
+             onClick={() => {
+               const d = new Date();
+               d.setDate(d.getDate() + 2);
+               d.setHours(9, 0, 0, 0);
+               setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: d.toISOString() } : t));
+               setActiveNudgeDropdownId(null);
+             }}
+             className="w-full text-left px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors border-b border-zinc-100 dark:border-zinc-700/50"
+           >
+             In 2 Days
+           </button>
+           <div className="px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 border-b border-zinc-100 dark:border-zinc-700/50 flex flex-col gap-1.5">
+             <span className="opacity-70">Custom Date:</span>
+             <input type="datetime-local" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-1 text-[11px] outline-none" onChange={(e) => {
+               if (e.target.value) {
+                 setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: new Date(e.target.value).toISOString() } : t));
+                 setActiveNudgeDropdownId(null);
+               }
+             }} />
+           </div>
+           {(task.nudgeDate || (task.isReminderActive && task.reminderTime)) && (
+             <button 
+               onClick={() => {
+                 setTaskBank((prev: any) => prev.map((t: any) => t.id === task.id ? { ...t, nudgeDate: undefined, isReminderActive: false, reminderTime: undefined } : t));
+                 setActiveNudgeDropdownId(null);
+               }}
+               className="w-full text-left px-3 py-2 text-xs font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 rounded-lg transition-colors border-b border-zinc-100 dark:border-zinc-700/50"
+             >
+               Clear Nudge
+             </button>
+           )}
+           <button onClick={() => archiveMasterTask(task.id)} className="w-full text-left px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors mt-0.5 flex items-center gap-2">
+             <CheckCircle2 className="w-3.5 h-3.5" /> Archive Task
+           </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
@@ -4297,45 +4331,64 @@ export default function Home() {
                     if (task) {
                       return (
                         <SortableListItem key={task.id} id={task.id} className={cn(
-                          "flex items-start gap-3 group border-b border-zinc-100 dark:border-zinc-800/50 pb-3 isolate rounded-md transition-all duration-300 bg-transparent cursor-pointer",
+                          "group border-b border-zinc-100 dark:border-zinc-800/50 isolate rounded-md transition-all duration-300 bg-transparent cursor-pointer relative overflow-hidden",
                           archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                         )}>
-                          <div className="relative flex items-center justify-center mt-0.5 shrink-0">
-                            <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
-                            <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                          </div>
-                          <div className="flex-1 flex flex-col min-w-0">
-                            <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
-                            {task.time && (
-                              <span className={cn(
-                                "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
-                                !task.is_done && isOverdue(task.time, dateKey)
-                                  ? "text-red-400 animate-pulse-opacity"
-                                  : !task.is_done && isApproaching(task.time, dateKey)
-                                  ? "text-amber-400 animate-pulse-opacity"
-                                  : "text-zinc-400"
-                              )}>
-                                <Clock className="w-3 h-3" />{task.time}
-                              </span>
-                            )}
-                            {/* Confirmation tooltip — early/manual archive prompt */}
-                            {archiveConfirmId === task.id && (
-                              <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                                <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
-                                <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
-                                <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                          <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar">
+                            <div className="w-full shrink-0 snap-center flex items-start gap-3 pb-3 pr-2">
+                              <div className="relative flex items-center justify-center mt-0.5 shrink-0">
+                                <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
+                                <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                               </div>
-                            )}
+                              <div className="flex-1 flex flex-col min-w-0">
+                                <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                                {task.time && (
+                                  <span className={cn(
+                                    "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
+                                    !task.is_done && isOverdue(task.time, dateKey)
+                                      ? "text-red-400 animate-pulse-opacity"
+                                      : !task.is_done && isApproaching(task.time, dateKey)
+                                      ? "text-amber-400 animate-pulse-opacity"
+                                      : "text-zinc-400"
+                                  )}>
+                                    <Clock className="w-3 h-3" />{task.time}
+                                  </span>
+                                )}
+                                {/* Confirmation tooltip — early/manual archive prompt */}
+                                {archiveConfirmId === task.id && (
+                                  <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
+                                    <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
+                                    <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                                  </div>
+                                )}
+                              </div>
+                              {renderTagDot(task.tag_id)}
+                            </div>
+                            
+                            {/* Mobile Swipe Action Tray */}
+                            <div className="shrink-0 snap-end flex md:hidden items-stretch bg-zinc-50 dark:bg-zinc-800/50 rounded-l-md ml-2 border-l border-zinc-200 dark:border-zinc-700/50 pb-3">
+                               <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+                               <button onClick={() => toggleDayTaskPriority(task.id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Make Priority"><Star className="w-5 h-5" /></button>
+                               {taskBank.some(t => t.id === task.master_id) ? (
+                                 <button onClick={() => smartArchiveFromDay(task)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
+                               ) : (
+                                 <div className="border-r border-zinc-200 dark:border-zinc-700/50"></div>
+                               )}
+                               <button onClick={() => removeDayTask(task.id, task.master_id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+                            </div>
                           </div>
-                          {renderTagDot(task.tag_id)}
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                          {/* Desktop Hover Action Tray */}
+                          <div className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
+                            <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                             <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
                             {taskBank.some(t => t.id === task.master_id) && (
                               <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
                                 <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
                               </button>
                             )}
-                            <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                            <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                           </div>
                         </SortableListItem>
                       );
@@ -4439,47 +4492,66 @@ export default function Home() {
                       if (task) {
                         return (
                           <SortableListItem key={task.id} id={task.id} className={cn(
-                            "flex items-center gap-3 group border-b border-zinc-200 dark:border-zinc-800 py-3 isolate rounded-md transition-colors duration-300 bg-transparent",
+                            "group border-b border-zinc-200 dark:border-zinc-800 isolate rounded-md transition-colors duration-300 bg-transparent cursor-pointer overflow-hidden relative",
                             archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                           )}>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="relative flex items-center justify-center shrink-0">
-                                <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-sage/40 rounded-full checked:bg-brand-sage checked:border-brand-sage transition-colors cursor-pointer" />
-                                <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                              </div>
-                              <span className="font-mono text-lg font-bold text-brand-sage/60 w-6 shrink-0 text-center">{i + 1}</span>
-                            </div>
-                            <div className="flex-1 flex flex-col cursor-pointer overflow-hidden min-w-0">
-                              <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
-                              {task.time && (
-                                <span className={cn(
-                                  "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
-                                  !task.is_done && isOverdue(task.time, dateKey)
-                                    ? "text-red-400 animate-pulse-opacity"
-                                    : !task.is_done && isApproaching(task.time, dateKey)
-                                    ? "text-amber-400 animate-pulse-opacity"
-                                    : "text-zinc-400"
-                                )}>
-                                  <Clock className="w-3 h-3" />{task.time}
-                                </span>
-                              )}
-                              {archiveConfirmId === task.id && (
-                                <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
-                                  <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
-                                  <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                            <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar">
+                              <div className="w-full shrink-0 snap-center flex items-center gap-3 py-3 pr-2">
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="relative flex items-center justify-center shrink-0">
+                                    <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-sage/40 rounded-full checked:bg-brand-sage checked:border-brand-sage transition-colors cursor-pointer" />
+                                    <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                  </div>
+                                  <span className="font-mono text-lg font-bold text-brand-sage/60 w-6 shrink-0 text-center">{i + 1}</span>
                                 </div>
-                              )}
+                                <div className="flex-1 flex flex-col cursor-pointer overflow-hidden min-w-0">
+                                  <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                                  {task.time && (
+                                    <span className={cn(
+                                      "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
+                                      !task.is_done && isOverdue(task.time, dateKey)
+                                        ? "text-red-400 animate-pulse-opacity"
+                                        : !task.is_done && isApproaching(task.time, dateKey)
+                                        ? "text-amber-400 animate-pulse-opacity"
+                                        : "text-zinc-400"
+                                    )}>
+                                      <Clock className="w-3 h-3" />{task.time}
+                                    </span>
+                                  )}
+                                  {archiveConfirmId === task.id && (
+                                    <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Archive from Bank?</span>
+                                      <button onClick={() => confirmArchive(task)} className="px-2.5 py-1 text-[11px] font-bold bg-brand-navy text-white rounded-md hover:bg-brand-navy/80 transition-colors">Yes</button>
+                                      <button onClick={declineArchive} className="px-2.5 py-1 text-[11px] font-bold bg-brand-sage/20 text-brand-sage rounded-md hover:bg-brand-sage/30 transition-colors">No</button>
+                                    </div>
+                                  )}
+                                </div>
+                                {renderTagDot(task.tag_id)}
+                              </div>
+                              
+                              {/* Mobile Swipe Action Tray */}
+                              <div className="shrink-0 snap-end flex md:hidden items-stretch bg-zinc-50 dark:bg-zinc-800/50 rounded-l-md ml-2 border-l border-zinc-200 dark:border-zinc-700/50">
+                                 <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+                                 <button onClick={() => toggleDayTaskPriority(task.id)} className="px-5 flex items-center justify-center text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Remove Priority"><Star className="w-5 h-5 fill-brand-sage" /></button>
+                                 {taskBank.some(t => t.id === task.master_id) ? (
+                                   <button onClick={() => smartArchiveFromDay(task)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
+                                 ) : (
+                                   <div className="border-r border-zinc-200 dark:border-zinc-700/50"></div>
+                                 )}
+                                 <button onClick={() => removeDayTask(task.id, task.master_id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+                              </div>
                             </div>
-                            {renderTagDot(task.tag_id)}
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                            {/* Desktop Hover Action Tray */}
+                            <div className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
+                              <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                               <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Remove Priority"><Star className="w-4 h-4 text-brand-sage fill-brand-sage" /></button>
                               {taskBank.some(t => t.id === task.master_id) && (
                                 <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
                                   <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
                                 </button>
                               )}
-                              <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                              <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                             </div>
                           </SortableListItem>
                         );

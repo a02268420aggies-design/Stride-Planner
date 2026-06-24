@@ -28,7 +28,16 @@ body {
 }
 
 @layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .animate-pulse-opacity {
+
     animation: pulse-opacity 2s ease-in-out infinite;
   }
 
