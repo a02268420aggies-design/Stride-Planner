@@ -240,6 +240,8 @@ const TaskBankCard = ({
   setRecurringModalTask,
   setEditingTask
 }: any) => {
+  const [hasTouch, setHasTouch] = useState(false);
+  useEffect(() => { setHasTouch(typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches); }, []);
   const [localPriority, setLocalPriority] = useState(task.is_priority);
   const [pulseColor, setPulseColor] = useState<string | null>(null);
   const [newTagName, setNewTagName] = useState("");
@@ -285,7 +287,37 @@ const TaskBankCard = ({
     )}
     style={pulseColor ? { boxShadow: `0 0 15px 2px ${pulseColor}40`, borderColor: pulseColor } : {}}
     >
-      <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar task-swipe-row" onPointerDownCapture={(e) => e.stopPropagation()}>
+            <div className="relative overflow-hidden isolate w-full">
+        {hasTouch && (
+          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50">
+
+           <button onClick={() => setEditingTask(task)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+           <button onClick={() => setLocalPriority(!localPriority)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Toggle Priority"><Star className={cn("w-5 h-5", localPriority && "text-brand-sage fill-brand-sage")} /></button>
+           <button onClick={(e) => { 
+             const rect = e.currentTarget.getBoundingClientRect();
+             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
+             setActiveTagDropdownId(activeTagDropdownId === task.id ? null : task.id); 
+             setActiveNudgeDropdownId(null); 
+           }} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50 popover-container" title="Tag Task"><Tag className="w-5 h-5" style={task.tag_id ? { color: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8', fill: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8' } : {}} /></button>
+           <button onClick={(e) => { 
+             const rect = e.currentTarget.getBoundingClientRect();
+             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
+             setActiveNudgeDropdownId(activeNudgeDropdownId === task.id ? null : task.id); 
+             setActiveTagDropdownId(null); 
+           }} className={cn("px-4 flex items-center justify-center transition-colors border-r border-zinc-200 dark:border-zinc-700/50 popover-container", task.nudgeDate || (task.isReminderActive && task.reminderTime) ? "text-brand-sage hover:text-brand-navy bg-brand-sage/10 dark:hover:text-brand-sage/80" : "text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10")} title="Nudge Task"><Bell className="w-5 h-5" /></button>
+           <button onClick={() => archiveMasterTask(task.id)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
+           <button onClick={() => setTaskBank((prev: any) => prev.filter((t: any) => t.id !== task.id))} className="px-4 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+        
+          </div>
+        )}
+        <motion.div
+          drag={hasTouch ? "x" : false}
+          dragConstraints={{ left: -320, right: 0 }}
+          dragElastic={0.1}
+          className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
+          onPointerDownCapture={(e) => e.stopPropagation()}
+        >
+
         <div className="w-full shrink-0 snap-center flex flex-col gap-3 p-4 relative">
           <div className="flex items-start gap-3">
             <button onClick={() => setLocalPriority(!localPriority)} className={cn("focus:outline-none shrink-0 mt-0.5 transition-opacity", !localPriority && "opacity-0 group-hover:opacity-100")}>
@@ -348,26 +380,7 @@ const TaskBankCard = ({
             <div className="w-8"></div>
           </div>
         </div>
-
-        {/* Mobile Swipe Action Tray */}
-        <div className="shrink-0 snap-end flex lg:hidden items-stretch bg-zinc-50 dark:bg-zinc-800/50 border-l border-zinc-200 dark:border-zinc-700/50">
-           <button onClick={() => setEditingTask(task)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
-           <button onClick={() => setLocalPriority(!localPriority)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Toggle Priority"><Star className={cn("w-5 h-5", localPriority && "text-brand-sage fill-brand-sage")} /></button>
-           <button onClick={(e) => { 
-             const rect = e.currentTarget.getBoundingClientRect();
-             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
-             setActiveTagDropdownId(activeTagDropdownId === task.id ? null : task.id); 
-             setActiveNudgeDropdownId(null); 
-           }} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50 popover-container" title="Tag Task"><Tag className="w-5 h-5" style={task.tag_id ? { color: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8', fill: tags.find((t: any) => t.id === task.tag_id)?.color || '#94a3b8' } : {}} /></button>
-           <button onClick={(e) => { 
-             const rect = e.currentTarget.getBoundingClientRect();
-             setPopoverCoords({ top: rect.top, right: window.innerWidth - rect.right, bottom: rect.bottom });
-             setActiveNudgeDropdownId(activeNudgeDropdownId === task.id ? null : task.id); 
-             setActiveTagDropdownId(null); 
-           }} className={cn("px-5 flex items-center justify-center transition-colors border-r border-zinc-200 dark:border-zinc-700/50 popover-container", task.nudgeDate || (task.isReminderActive && task.reminderTime) ? "text-brand-sage hover:text-brand-navy bg-brand-sage/10 dark:hover:text-brand-sage/80" : "text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage hover:bg-brand-navy/5 dark:hover:bg-brand-sage/10")} title="Nudge Task"><Bell className="w-5 h-5" /></button>
-           <button onClick={() => archiveMasterTask(task.id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
-           <button onClick={() => setTaskBank((prev: any) => prev.filter((t: any) => t.id !== task.id))} className="px-5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
-        </div>
+        </motion.div>
       </div>
 
       {/* Desktop Hover Action Tray */}
@@ -4336,7 +4349,29 @@ export default function Home() {
                           "group border-b border-zinc-100 dark:border-zinc-800/50 isolate rounded-md transition-all duration-300 bg-transparent cursor-pointer relative overflow-hidden",
                           archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                         )}>
-                          <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar task-swipe-row" onPointerDownCapture={(e) => e.stopPropagation()}>
+                                <div className="relative overflow-hidden isolate w-full">
+        {hasTouch && (
+          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50">
+
+                               <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+                               <button onClick={() => toggleDayTaskPriority(task.id)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Make Priority"><Star className="w-5 h-5" /></button>
+                               {taskBank.some(t => t.id === task.master_id) ? (
+                                 <button onClick={() => smartArchiveFromDay(task)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
+                               ) : (
+                                 <div className="border-r border-zinc-200 dark:border-zinc-700/50"></div>
+                               )}
+                               <button onClick={() => removeDayTask(task.id, task.master_id)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+                            
+          </div>
+        )}
+        <motion.div
+          drag={hasTouch ? "x" : false}
+          dragConstraints={{ left: -220, right: 0 }}
+          dragElastic={0.1}
+          className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
+          onPointerDownCapture={(e) => e.stopPropagation()}
+        >
+
                             <div className="w-full shrink-0 snap-center flex items-start gap-3 pb-3 pr-2">
                               <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                                 <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
@@ -4367,21 +4402,10 @@ export default function Home() {
                               </div>
                               {renderTagDot(task.tag_id)}
                             </div>
-                            
-                            {/* Mobile Swipe Action Tray */}
-                            <div className="shrink-0 snap-end flex lg:hidden items-stretch bg-zinc-50 dark:bg-zinc-800/50 rounded-l-md ml-2 border-l border-zinc-200 dark:border-zinc-700/50 pb-3">
-                               <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
-                               <button onClick={() => toggleDayTaskPriority(task.id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Make Priority"><Star className="w-5 h-5" /></button>
-                               {taskBank.some(t => t.id === task.master_id) ? (
-                                 <button onClick={() => smartArchiveFromDay(task)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
-                               ) : (
-                                 <div className="border-r border-zinc-200 dark:border-zinc-700/50"></div>
-                               )}
-                               <button onClick={() => removeDayTask(task.id, task.master_id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
-                            </div>
-                          </div>
+        </motion.div>
+      </div>
 
-                          {/* Desktop Hover Action Tray */}
+      {/* Desktop Hover Action Tray */}
                           <div className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
                             <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                             <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
@@ -4497,7 +4521,29 @@ export default function Home() {
                             "group border-b border-zinc-200 dark:border-zinc-800 isolate rounded-md transition-colors duration-300 bg-transparent cursor-pointer overflow-hidden relative",
                             archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                           )}>
-                            <div className="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar task-swipe-row" onPointerDownCapture={(e) => e.stopPropagation()}>
+                                  <div className="relative overflow-hidden isolate w-full">
+        {hasTouch && (
+          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50">
+
+                                 <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+                                 <button onClick={() => toggleDayTaskPriority(task.id)} className="px-4 flex items-center justify-center text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Remove Priority"><Star className="w-5 h-5 fill-brand-sage" /></button>
+                                 {taskBank.some(t => t.id === task.master_id) ? (
+                                   <button onClick={() => smartArchiveFromDay(task)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
+                                 ) : (
+                                   <div className="border-r border-zinc-200 dark:border-zinc-700/50"></div>
+                                 )}
+                                 <button onClick={() => removeDayTask(task.id, task.master_id)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+                              
+          </div>
+        )}
+        <motion.div
+          drag={hasTouch ? "x" : false}
+          dragConstraints={{ left: -220, right: 0 }}
+          dragElastic={0.1}
+          className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
+          onPointerDownCapture={(e) => e.stopPropagation()}
+        >
+
                               <div className="w-full shrink-0 snap-center flex items-center gap-3 py-3 pr-2">
                                 <div className="flex items-center gap-2 shrink-0">
                                   <div className="relative flex items-center justify-center shrink-0">
@@ -4530,21 +4576,10 @@ export default function Home() {
                                 </div>
                                 {renderTagDot(task.tag_id)}
                               </div>
-                              
-                              {/* Mobile Swipe Action Tray */}
-                              <div className="shrink-0 snap-end flex lg:hidden items-stretch bg-zinc-50 dark:bg-zinc-800/50 rounded-l-md ml-2 border-l border-zinc-200 dark:border-zinc-700/50">
-                                 <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-5 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
-                                 <button onClick={() => toggleDayTaskPriority(task.id)} className="px-5 flex items-center justify-center text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Remove Priority"><Star className="w-5 h-5 fill-brand-sage" /></button>
-                                 {taskBank.some(t => t.id === task.master_id) ? (
-                                   <button onClick={() => smartArchiveFromDay(task)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
-                                 ) : (
-                                   <div className="border-r border-zinc-200 dark:border-zinc-700/50"></div>
-                                 )}
-                                 <button onClick={() => removeDayTask(task.id, task.master_id)} className="px-5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
-                              </div>
-                            </div>
+        </motion.div>
+      </div>
 
-                            {/* Desktop Hover Action Tray */}
+      {/* Desktop Hover Action Tray */}
                             <div className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
                               <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                               <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Remove Priority"><Star className="w-4 h-4 text-brand-sage fill-brand-sage" /></button>
