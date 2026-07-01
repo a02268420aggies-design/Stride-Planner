@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -8,6 +7,7 @@ import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical } from "lucide-react";
+
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -4832,15 +4832,6 @@ export default function Home() {
                     className="flex w-[600%] h-full items-start"
                     animate={{ x: `-${activeIdx * (100 / 6)}%` }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    onDragEnd={(e, { offset, velocity }) => {
-                      const swipe = Math.abs(offset.x) * velocity.x;
-                      if (swipe < -10000 && activeIdx < mobileTabs.length - 1) setActiveMobileTab(mobileTabs[activeIdx + 1]);
-                      else if (swipe > 10000 && activeIdx > 0) setActiveMobileTab(mobileTabs[activeIdx - 1]);
-                      else if (offset.x < -50 && activeIdx < mobileTabs.length - 1) setActiveMobileTab(mobileTabs[activeIdx + 1]);
-                      else if (offset.x > 50 && activeIdx > 0) setActiveMobileTab(mobileTabs[activeIdx - 1]);
-                    }}
                   >
                     <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden">{prioritiesSection}</div>
                     <div className="w-1/6 shrink-0 h-full overflow-y-auto overflow-x-hidden p-6">{todosSection}</div>
