@@ -240,8 +240,8 @@ const TaskBankCard = ({
   setRecurringModalTask,
   setEditingTask
 }: any) => {
-  const [hasTouch, setHasTouch] = useState(false);
-  useEffect(() => { setHasTouch(typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches); }, []);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => { setIsTouchDevice(typeof window !== 'undefined' && (window.matchMedia("(hover: none)").matches || navigator.maxTouchPoints > 0)); }, []);
   const [localPriority, setLocalPriority] = useState(task.is_priority);
   const [pulseColor, setPulseColor] = useState<string | null>(null);
   const [newTagName, setNewTagName] = useState("");
@@ -288,7 +288,7 @@ const TaskBankCard = ({
     style={pulseColor ? { boxShadow: `0 0 15px 2px ${pulseColor}40`, borderColor: pulseColor } : {}}
     >
             <div className="relative overflow-hidden isolate w-full">
-        {hasTouch && (
+        {isTouchDevice && (
           <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50">
 
            <button onClick={() => setEditingTask(task)} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
@@ -311,7 +311,7 @@ const TaskBankCard = ({
           </div>
         )}
         <motion.div
-          drag={hasTouch ? "x" : false}
+          drag={isTouchDevice ? "x" : false}
           dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0.1}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -637,13 +637,13 @@ export default function Home() {
   const [hasMounted, setHasMounted] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState('priorities');
   const [isMobile, setIsMobile] = useState(false);
-  const [hasTouch, setHasTouch] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     handleResize();
     window.addEventListener('resize', handleResize);
-    setHasTouch(window.matchMedia('(hover: none)').matches);
+    setIsTouchDevice(typeof window !== 'undefined' && (window.matchMedia("(hover: none)").matches || navigator.maxTouchPoints > 0));
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const sensors = useSensors(
@@ -1002,6 +1002,20 @@ export default function Home() {
     try { localStorage.setItem('stride-weekly-journal', JSON.stringify(weeklyJournal)); } catch {}
   }, [weeklyJournal]);
 
+  const [tags, setTags] = useState<TagItem[]>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem('stride-tags');
+        if (saved) return JSON.parse(saved);
+      }
+      return defaultTags;
+    } catch { return defaultTags; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('stride-tags', JSON.stringify(tags)); } catch {}
+  }, [tags]);
+
   useEffect(() => {
     try { localStorage.setItem('stride-monthly-milestones', JSON.stringify(monthlyMilestones)); } catch {}
   }, [monthlyMilestones]);
@@ -1010,7 +1024,6 @@ export default function Home() {
   const [huddleYesterdayItems, setHuddleYesterdayItems] = useState<TaskItem[]>([]);
   const [huddleBufferItems, setHuddleBufferItems] = useState<TaskItem[]>([]);
 
-  const [tags, setTags] = useState<TagItem[]>(defaultTags);
   const [taskBank, setTaskBank] = useState<MasterTask[]>(() => {
     try {
       const saved = localStorage.getItem('stride-task-bank');
@@ -2809,7 +2822,7 @@ export default function Home() {
                                <button type="button" onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm border border-black/10 transition-transform hover:scale-110" style={{ backgroundColor: tempTagColor }} title="Change tag color" />
                              ) : (<Tag className="w-3.5 h-3.5 text-zinc-400 shrink-0" />)}
                              {isPaletteOpen && activeInlineCol === colKey && (
-                               <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-[200] flex gap-2 w-max animate-in fade-in slide-in-from-top-2 duration-100">
+                               <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-[250] flex flex-wrap gap-2 w-[90vw] max-w-[320px] mx-auto sm:w-max animate-in fade-in slide-in-from-top-2 duration-100">
                                  {aestheticColors.map(color => (
                                    <button key={color} type="button" className={cn("w-5 h-5 rounded-full hover:scale-110 transition-transform", tempTagColor === color && "ring-2 ring-offset-2 ring-brand-navy dark:ring-offset-zinc-800")} style={{ backgroundColor: color }} onClick={() => handleUpdateTagColor(color)} />
                                  ))}
@@ -3977,7 +3990,7 @@ export default function Home() {
       {/* Task Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
               <h2 className="text-xl font-bold text-brand-navy dark:text-white">New Task</h2>
               <button onClick={() => { setIsModalOpen(false); resetModal(); }} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"><X className="w-5 h-5" /></button>
@@ -4010,7 +4023,7 @@ export default function Home() {
                       <button type="button" onClick={(e) => { e.stopPropagation(); setIsPaletteOpen(!isPaletteOpen); }} className="w-4 h-4 rounded-full shrink-0 shadow-sm border border-black/10 transition-transform hover:scale-110" style={{ backgroundColor: tempTagColor }} title="Change tag color" />
                     ) : (<Tag className="w-4 h-4 text-zinc-400 shrink-0" />)}
                     {isPaletteOpen && (
-                      <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-[200] flex gap-2 w-max animate-in fade-in zoom-in-95 duration-100">
+                      <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl z-[250] flex flex-wrap gap-2 w-[90vw] max-w-[320px] mx-auto sm:w-max sm:left-auto sm:right-0 animate-in fade-in zoom-in-95 duration-100">
                         {aestheticColors.map(color => (
                           <button key={color} type="button" className={cn("w-6 h-6 rounded-full hover:scale-110 transition-transform", tempTagColor === color && "ring-2 ring-offset-2 ring-brand-navy dark:ring-offset-zinc-800")} style={{ backgroundColor: color }} onClick={() => handleUpdateTagColor(color)} />
                         ))}
@@ -4350,7 +4363,7 @@ export default function Home() {
                           archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                         )}>
                                 <div className="relative overflow-hidden isolate w-full">
-        {hasTouch && (
+        {isTouchDevice && (
           <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50">
 
                                <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
@@ -4365,7 +4378,7 @@ export default function Home() {
           </div>
         )}
         <motion.div
-          drag={hasTouch ? "x" : false}
+          drag={isTouchDevice ? "x" : false}
           dragConstraints={{ left: -220, right: 0 }}
           dragElastic={0.1}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -4522,7 +4535,7 @@ export default function Home() {
                             archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                           )}>
                                   <div className="relative overflow-hidden isolate w-full">
-        {hasTouch && (
+        {isTouchDevice && (
           <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50">
 
                                  <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="px-4 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
@@ -4537,7 +4550,7 @@ export default function Home() {
           </div>
         )}
         <motion.div
-          drag={hasTouch ? "x" : false}
+          drag={isTouchDevice ? "x" : false}
           dragConstraints={{ left: -220, right: 0 }}
           dragElastic={0.1}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
