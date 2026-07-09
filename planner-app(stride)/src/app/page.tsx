@@ -8,7 +8,7 @@ import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical } from "lucide-react";
 
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -312,12 +312,11 @@ const TaskBankCard = ({
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -200, right: 200 }}
-          dragElastic={0.5}
+          dragConstraints={{ left: -160, right: 0 }}
+          dragElastic={0.1}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
           onPointerDownCapture={(e) => e.stopPropagation()}
-          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); }}
         >
 
         <div className="w-full shrink-0 snap-center flex flex-col gap-3 p-4 relative">
@@ -649,7 +648,8 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const router = useRouter();
@@ -4354,8 +4354,6 @@ export default function Home() {
 <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-brand-navy uppercase tracking-wider border-b-2 border-brand-navy/20 pb-1 w-full shrink-0">To Do's:</h2>
             </div>
-            
-              <div className="text-[10px] text-red-500 p-1 bg-gray-100 md:hidden">Touch Test Active - Drag Constraints Left:-200 Right:200</div>
 <div className="flex flex-col gap-4 flex-1 touch-pan-y">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleTodoDragEnd(e, dateKey)}>
                 <SortableContext items={todoRenderSlots.map((t, i) => t ? t.id : `empty-todo-slot-${i}`)} strategy={verticalListSortingStrategy}>
@@ -4383,12 +4381,11 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -200, right: 200 }}
-          dragElastic={0.5}
+          dragConstraints={{ left: -160, right: 0 }}
+          dragElastic={0.1}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
           onPointerDownCapture={(e) => e.stopPropagation()}
-          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); }}
         >
 
                             <div className="w-full shrink-0 snap-center flex items-start gap-3 pb-3 pr-2">
@@ -4523,8 +4520,6 @@ export default function Home() {
                 Priorities:
                 <span className="text-xs font-normal text-zinc-400 normal-case bg-brand-sage/10 px-2 py-0.5 rounded-full">Top 5</span>
               </h2>
-              
-              <div className="text-[10px] text-red-500 p-1 bg-gray-100 md:hidden">Touch Test Active - Drag Constraints Left:-200 Right:200</div>
 <div className="flex flex-col gap-0 touch-pan-y">
                 <DndContext 
                   sensors={sensors} 
@@ -4559,12 +4554,11 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -200, right: 200 }}
-          dragElastic={0.5}
+          dragConstraints={{ left: -160, right: 0 }}
+          dragElastic={0.1}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
           onPointerDownCapture={(e) => e.stopPropagation()}
-          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); }}
         >
 
                               <div className="w-full shrink-0 snap-center flex items-center gap-3 py-3 pr-2">
@@ -4697,9 +4691,6 @@ export default function Home() {
                   className="bg-transparent border-none outline-none w-full text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400"
                 />
               </form>
-
-              
-              <div className="text-[10px] text-red-500 p-1 bg-gray-100 md:hidden">Touch Test Active - Drag Constraints Left:-200 Right:200</div>
 <div className="flex flex-col gap-3 touch-pan-y">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGoalDragEnd(e, dateKey)}>
                   <SortableContext items={goalRenderSlots.map((t, i) => t ? t.id : `empty-goal-slot-${i}`)} strategy={verticalListSortingStrategy}>
