@@ -312,7 +312,7 @@ const TaskBankCard = ({
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -160, right: 0 }}
+          dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0.1}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -4380,7 +4380,7 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -160, right: 0 }}
+          dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0.1}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -4552,7 +4552,7 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -160, right: 0 }}
+          dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0.1}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -4893,13 +4893,13 @@ export default function Home() {
                 <>
                   <div className="flex flex-col lg:flex-row flex-1 shrink-0">
                     <div className={cn(
-                      "flex-[1.2] border-r-2 border-zinc-200 dark:border-zinc-800 p-6 flex flex-col gap-4 transition-all duration-300",
+                      "flex-[1.2] overflow-x-hidden border-r-2 border-zinc-200 dark:border-zinc-800 p-6 flex flex-col gap-4 transition-all duration-300",
                       migratedDate === dateKey && "ring-4 ring-brand-navy dark:ring-brand-navy/50 bg-brand-navy/5 scale-[1.02] z-30 shadow-[0_0_20px_rgba(0,0,128,0.2)] rounded-2xl border-transparent"
                     )}>
                       {todosSection}
                       {mealsSection}
                     </div>
-                    <div className="flex-1 flex flex-col border-none">
+                    <div className="flex-1 flex flex-col border-none overflow-x-hidden">
                       {prioritiesSection}
                       {goalsSection}
                       {healthSection}
