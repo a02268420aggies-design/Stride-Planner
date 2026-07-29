@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { ConcentricRings } from "@/components/ConcentricRings";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
 import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical } from "lucide-react";
 
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+
 
 type TagItem = { id: string; name: string; color: string; };
 type RecurringTask = { id: string; text: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
@@ -172,43 +170,37 @@ const findTagNameByColor = (colorHex: string, tagsList: TagItem[]): string | nul
   return match ? match.name : null;
 };
 
-const SortableListItem = ({ id, className, isDraggingClass, children }: { id: string; className?: string; isDraggingClass?: string; children: React.ReactNode }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+
+
+const ReorderableListItem = ({ item, className, isDraggingClass, children }: { item: any; className?: string; isDraggingClass?: string; children: React.ReactNode }) => {
+  const dragControls = useDragControls();
+  let holdTimeout: NodeJS.Timeout;
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    holdTimeout = setTimeout(() => {
+      dragControls.start(e);
+    }, 300);
+  };
+
+  const handlePointerUpOrLeave = () => {
+    clearTimeout(holdTimeout);
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        className,
-        "relative",
-        isDragging && (isDraggingClass || "scale-[1.02] shadow-xl bg-white dark:bg-zinc-900 z-[100] border-transparent opacity-90")
-      )}
+    <Reorder.Item
+      value={item}
+      dragListener={false}
+      dragControls={dragControls}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUpOrLeave}
+      onPointerLeave={handlePointerUpOrLeave}
+      className={cn(className, "relative")}
     >
-      <div 
-        {...attributes} 
-        {...listeners} 
-        className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1"
-      >
-        <GripVertical className="w-4 h-4 text-zinc-400" />
-      </div>
       {children}
-    </div>
+    </Reorder.Item>
   );
 };
-
 
 const TaskBankCard = ({
   task,
@@ -646,11 +638,50 @@ export default function Home() {
     setIsTouchDevice(typeof window !== 'undefined' && (window.matchMedia("(hover: none)").matches || navigator.maxTouchPoints > 0));
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const handleTodoReorder = (newOrder: any[], dateKey: string) => {
+    setDataStore(prev => {
+      const dayData = prev[dateKey] || getEmptyDay();
+      const items = [...dayData.items];
+      let rank = 0;
+      newOrder.forEach((item) => {
+        if (!("is_empty" in item)) {
+          const idx = items.findIndex(t => t.id === item.id);
+          if (idx !== -1) items[idx] = { ...items[idx], todo_rank: rank++ };
+        }
+      });
+      return { ...prev, [dateKey]: { ...dayData, items } };
+    });
+  };
+
+  const handlePriorityReorder = (newOrder: any[], dateKey: string) => {
+    setDataStore(prev => {
+      const dayData = prev[dateKey] || getEmptyDay();
+      const items = [...dayData.items];
+      let rank = 0;
+      newOrder.forEach((item) => {
+        if (!("is_empty" in item)) {
+          const idx = items.findIndex(t => t.id === item.id);
+          if (idx !== -1) items[idx] = { ...items[idx], priority_rank: rank++ };
+        }
+      });
+      return { ...prev, [dateKey]: { ...dayData, items } };
+    });
+  };
+
+  const handleGoalReorder = (newOrder: any[], dateKey: string) => {
+    setDataStore(prev => {
+      const dayData = prev[dateKey] || getEmptyDay();
+      const items = [...dayData.items];
+      let rank = 0;
+      newOrder.forEach((item) => {
+        if (!("is_empty" in item)) {
+          const idx = items.findIndex(t => t.id === item.id);
+          if (idx !== -1) items[idx] = { ...items[idx], goal_rank: rank++ };
+        }
+      });
+      return { ...prev, [dateKey]: { ...dayData, items } };
+    });
+  };
   const router = useRouter();
   const [isPulsingToday, setIsPulsingToday] = useState(false);
   const [slideDirection, setSlideDirection] = useState(1);
@@ -746,121 +777,7 @@ export default function Home() {
   const [migratedDate, setMigratedDate] = useState<string | null>(null);
   const [migrationToast, setMigrationToast] = useState<string | null>(null);
 
-  const handlePriorityDragEnd = (event: DragEndEvent, dateKey: string) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
 
-    setDataStore((prev: any) => {
-      const dayData = prev[dateKey];
-      if (!dayData || !dayData.items) return prev;
-      
-      const goalsTagId = tags.find((t: any) => t.name.toLowerCase() === "goals")?.id;
-      const rawPriorities = dayData.items.filter((t: any) => t.is_priority && t.tag_id !== goalsTagId);
-      
-      let unranked = rawPriorities.filter((t: any) => t.priority_rank === undefined);
-      const computedSlots = Array.from({ length: 5 }).map((_, i) => {
-        const explicit = rawPriorities.find((t: any) => t.priority_rank === i);
-        if (explicit) return explicit;
-        if (unranked.length > 0) return unranked.shift();
-        return { id: `empty-slot-${i}`, is_empty: true };
-      });
-      
-      const oldIndex = computedSlots.findIndex((t: any) => t.id === active.id);
-      const newIndex = computedSlots.findIndex((t: any) => t.id === over.id);
-      
-      if (oldIndex === -1 || newIndex === -1) return prev;
-      
-      const newSlots = arrayMove(computedSlots, oldIndex, newIndex);
-      const newPriorities = newSlots.map((t: any, i: number) => t.is_empty ? null : { ...t, priority_rank: i }).filter(Boolean);
-      const otherItems = dayData.items.filter((t: any) => !(t.is_priority && t.tag_id !== goalsTagId));
-      
-      return {
-        ...prev,
-        [dateKey]: {
-          ...dayData,
-          items: [...newPriorities, ...otherItems]
-        }
-      };
-    });
-  };
-
-  const handleTodoDragEnd = (event: DragEndEvent, dateKey: string) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    setDataStore((prev: any) => {
-      const dayData = prev[dateKey];
-      if (!dayData || !dayData.items) return prev;
-      
-      const goalsTagId = tags.find((t: any) => t.name.toLowerCase() === "goals")?.id;
-      const rawTodos = dayData.items.filter((t: any) => !t.is_priority && t.tag_id !== goalsTagId);
-      
-      let unranked = rawTodos.filter((t: any) => t.todo_rank === undefined);
-      const maxLen = Math.max(9, rawTodos.length);
-      const computedSlots = Array.from({ length: maxLen }).map((_, i) => {
-        const explicit = rawTodos.find((t: any) => t.todo_rank === i);
-        if (explicit) return explicit;
-        if (unranked.length > 0) return unranked.shift();
-        return { id: `empty-todo-slot-${i}`, is_empty: true };
-      });
-      
-      const oldIndex = computedSlots.findIndex((t: any) => t.id === active.id);
-      const newIndex = computedSlots.findIndex((t: any) => t.id === over.id);
-      
-      if (oldIndex === -1 || newIndex === -1) return prev;
-      
-      const newSlots = arrayMove(computedSlots, oldIndex, newIndex);
-      const newTodos = newSlots.map((t: any, i: number) => t.is_empty ? null : { ...t, todo_rank: i }).filter(Boolean);
-      const otherItems = dayData.items.filter((t: any) => t.is_priority || t.tag_id === goalsTagId);
-      
-      return {
-        ...prev,
-        [dateKey]: {
-          ...dayData,
-          items: [...newTodos, ...otherItems]
-        }
-      };
-    });
-  };
-
-  const handleGoalDragEnd = (event: DragEndEvent, dateKey: string) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    setDataStore((prev: any) => {
-      const dayData = prev[dateKey];
-      if (!dayData || !dayData.items) return prev;
-      
-      const goalsTagId = tags.find((t: any) => t.name.toLowerCase() === "goals")?.id;
-      const rawGoals = dayData.items.filter((t: any) => t.tag_id === goalsTagId);
-      
-      let unranked = rawGoals.filter((t: any) => t.goal_rank === undefined);
-      const maxLen = Math.max(5, rawGoals.length);
-      const computedSlots = Array.from({ length: maxLen }).map((_, i) => {
-        const explicit = rawGoals.find((t: any) => t.goal_rank === i);
-        if (explicit) return explicit;
-        if (unranked.length > 0) return unranked.shift();
-        return { id: `empty-goal-slot-${i}`, is_empty: true };
-      });
-      
-      const oldIndex = computedSlots.findIndex((t: any) => t.id === active.id);
-      const newIndex = computedSlots.findIndex((t: any) => t.id === over.id);
-      
-      if (oldIndex === -1 || newIndex === -1) return prev;
-      
-      const newSlots = arrayMove(computedSlots, oldIndex, newIndex);
-      const newGoals = newSlots.map((t: any, i: number) => t.is_empty ? null : { ...t, goal_rank: i }).filter(Boolean);
-      const otherItems = dayData.items.filter((t: any) => t.tag_id !== goalsTagId);
-      
-      return {
-        ...prev,
-        [dateKey]: {
-          ...dayData,
-          items: [...newGoals, ...otherItems]
-        }
-      };
-    });
-  };
 
   useEffect(() => setHasMounted(true), []);
 
@@ -2341,7 +2258,7 @@ export default function Home() {
     const explicit = prioritiesArray.find(t => t.priority_rank === i);
     if (explicit) return explicit;
     if (unrankedPriorities.length > 0) return unrankedPriorities.shift();
-    return null;
+    return { id: `empty-priority-slot-${i}`, is_empty: true };
   });
 
   let unrankedTodos = tasksArray.filter(t => t.todo_rank === undefined);
@@ -2349,7 +2266,7 @@ export default function Home() {
     const explicit = tasksArray.find(t => t.todo_rank === i);
     if (explicit) return explicit;
     if (unrankedTodos.length > 0) return unrankedTodos.shift();
-    return null;
+    return { id: `empty-todo-slot-${i}`, is_empty: true };
   });
 
   let unrankedGoals = goalsArray.filter(t => t.goal_rank === undefined);
@@ -2357,7 +2274,7 @@ export default function Home() {
     const explicit = goalsArray.find(t => t.goal_rank === i);
     if (explicit) return explicit;
     if (unrankedGoals.length > 0) return unrankedGoals.shift();
-    return null;
+    return { id: `empty-goal-slot-${i}`, is_empty: true };
   });
 
   // ─── Derived goal states (tied to dateKey via dayData) ────────────────────
@@ -4354,12 +4271,11 @@ export default function Home() {
               <h2 className="text-lg font-bold text-brand-navy uppercase tracking-wider border-b-2 border-brand-navy/20 pb-1 w-full shrink-0">To Do's:</h2>
             </div>
 <div className="flex flex-col gap-4 flex-1 touch-pan-y">
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleTodoDragEnd(e, dateKey)}>
-                <SortableContext items={todoRenderSlots.map((t, i) => t ? t.id : `empty-todo-slot-${i}`)} strategy={verticalListSortingStrategy}>
+              <Reorder.Group as="div" values={todoRenderSlots} onReorder={(newOrder) => handleTodoReorder(newOrder, dateKey)} className="flex flex-col gap-4 flex-1 touch-pan-y">
                   {todoRenderSlots.map((task, i) => {
-                    if (task) {
+                    if (task && !("is_empty" in task)) {
                       return (
-                        <SortableListItem key={task.id} id={task.id} className={cn(
+                        <ReorderableListItem key={task!.id} item={task!} className={cn(
                           "group border-b border-zinc-100 dark:border-zinc-800/50 isolate rounded-md transition-all duration-300 bg-transparent cursor-pointer relative overflow-hidden",
                           archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                         )}>
@@ -4430,18 +4346,17 @@ export default function Home() {
                             )}
                             <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                           </div>
-                        </SortableListItem>
+                        </ReorderableListItem>
                       );
                     } else {
                       return (
-                        <SortableListItem key={`empty-todo-slot-${i}`} id={`empty-todo-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="border-b border-zinc-200 dark:border-zinc-800/50 h-10 w-full bg-transparent cursor-pointer">
+                        <ReorderableListItem key={task!.id} item={task!} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="border-b border-zinc-200 dark:border-zinc-800/50 h-10 w-full bg-transparent cursor-pointer">
                           <div className="w-full h-full"></div>
-                        </SortableListItem>
+                        </ReorderableListItem>
                       );
                     }
                   })}
-                </SortableContext>
-              </DndContext>
+              </Reorder.Group>
             </div>
             </div>
           );
@@ -4519,19 +4434,11 @@ export default function Home() {
                 <span className="text-xs font-normal text-zinc-400 normal-case bg-brand-sage/10 px-2 py-0.5 rounded-full">Top 5</span>
               </h2>
 <div className="flex flex-col gap-0 touch-pan-y">
-                <DndContext 
-                  sensors={sensors} 
-                  collisionDetection={closestCenter} 
-                  onDragEnd={(e) => handlePriorityDragEnd(e, dateKey)}
-                >
-                  <SortableContext 
-                    items={priorityRenderSlots.map((t, i) => t ? t.id : `empty-slot-${i}`)} 
-                    strategy={verticalListSortingStrategy}
-                  >
+                <Reorder.Group as="div" values={priorityRenderSlots} onReorder={(newOrder) => handlePriorityReorder(newOrder, dateKey)} className="flex flex-col gap-0 w-full touch-pan-y">
                     {priorityRenderSlots.map((task, i) => {
-                      if (task) {
+                      if (task && !("is_empty" in task)) {
                         return (
-                          <SortableListItem key={task.id} id={task.id} className={cn(
+                          <ReorderableListItem key={task!.id} item={task!} className={cn(
                             "group border-b border-zinc-200 dark:border-zinc-800 isolate rounded-md transition-colors duration-300 bg-transparent cursor-pointer overflow-hidden relative",
                             archivedFlashId === task.id && "bg-green-50 dark:bg-green-900/20 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                           )}>
@@ -4604,22 +4511,21 @@ export default function Home() {
                               )}
                               <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                             </div>
-                          </SortableListItem>
+                          </ReorderableListItem>
                         );
                       } else {
                         return (
-                          <SortableListItem key={`empty-slot-${i}`} id={`empty-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 py-3 bg-transparent">
+                          <ReorderableListItem key={task!.id} item={task!} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 py-3 bg-transparent">
                             <div className="flex items-center gap-2 shrink-0">
                               <div className="w-5 h-5 border-2 border-brand-sage/10 rounded-full shrink-0"></div>
                               <span className="font-mono text-lg font-bold text-brand-sage/30 w-6 shrink-0 text-center">{i + 1}</span>
                             </div>
                             <div className="flex-1"></div>
-                          </SortableListItem>
-                        );
-                      }
-                    })}
-                  </SortableContext>
-                </DndContext>
+                          </ReorderableListItem>
+                      );
+                    }
+                  })}
+              </Reorder.Group>
               </div>
             </div>
 
@@ -4689,30 +4595,28 @@ export default function Home() {
                 />
               </form>
 <div className="flex flex-col gap-3 touch-pan-y">
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGoalDragEnd(e, dateKey)}>
-                  <SortableContext items={goalRenderSlots.map((t, i) => t ? t.id : `empty-goal-slot-${i}`)} strategy={verticalListSortingStrategy}>
+                <Reorder.Group as="div" values={goalRenderSlots} onReorder={(newOrder) => handleGoalReorder(newOrder, dateKey)} className="flex flex-col gap-3 w-full touch-pan-y">
                     {goalRenderSlots.map((task, i) => {
-                      if (task) {
+                      if (task && !("is_empty" in task)) {
                         return (
-                          <SortableListItem key={task.id} id={task.id} className="flex items-center gap-3 group isolate cursor-pointer bg-transparent">
+                          <ReorderableListItem key={task!.id} item={task!} className="flex items-center gap-3 group isolate cursor-pointer bg-transparent">
                             <div className="relative flex items-center justify-center shrink-0">
                               <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-zinc-400 checked:border-zinc-400 transition-all cursor-pointer" />
                               <svg className="absolute w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                             </div>
                             <span className={cn("text-base transition-all flex-1 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
                             <button onClick={() => removeDayTask(task.id, task.master_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-all"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
-                          </SortableListItem>
+                          </ReorderableListItem>
                         );
                       } else {
                         return (
-                          <SortableListItem key={`empty-goal-slot-${i}`} id={`empty-goal-slot-${i}`} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="border-b border-zinc-200 dark:border-zinc-800/50 h-8 w-full mt-2 bg-transparent cursor-pointer">
+                          <ReorderableListItem key={task!.id} item={task!} isDraggingClass="opacity-50 scale-100 bg-zinc-50/50 dark:bg-zinc-800/50" className="border-b border-zinc-200 dark:border-zinc-800/50 h-8 w-full mt-2 bg-transparent cursor-pointer">
                             <div className="w-full h-full"></div>
-                          </SortableListItem>
-                        );
-                      }
-                    })}
-                  </SortableContext>
-                </DndContext>
+                          </ReorderableListItem>
+                      );
+                    }
+                  })}
+              </Reorder.Group>
               </div>
             </div>
 
