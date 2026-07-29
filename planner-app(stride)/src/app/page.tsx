@@ -304,8 +304,9 @@ const TaskBankCard = ({
         )}
         <motion.div
           drag="x"
+          dragDirectionLock
           dragConstraints={{ left: -320, right: 0 }}
-          dragElastic={0.1}
+          dragElastic={0}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
         >
@@ -4296,8 +4297,9 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
+          dragDirectionLock
           dragConstraints={{ left: -320, right: 0 }}
-          dragElastic={0.1}
+          dragElastic={0}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
         >
@@ -4459,8 +4461,9 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
+          dragDirectionLock
           dragConstraints={{ left: -320, right: 0 }}
-          dragElastic={0.1}
+          dragElastic={0}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
         >
