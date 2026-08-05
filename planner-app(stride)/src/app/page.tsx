@@ -196,7 +196,11 @@ const DragHandle = () => {
   const dragControls = React.useContext(DragContext);
   return (
     <div
-      onPointerDown={(e) => dragControls.start(e)}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        dragControls.start(e);
+      }}
       className="p-1.5 flex items-center justify-center cursor-grab active:cursor-grabbing text-zinc-300 hover:text-zinc-500 transition-colors touch-none"
     >
       <GripVertical className="w-5 h-5" />
@@ -4306,7 +4310,7 @@ export default function Home() {
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
         >
 
-                            <div className="w-full shrink-0 snap-center flex items-start gap-3 pb-3 pr-2">
+                            <div className="w-full shrink-0 snap-center flex items-center gap-3 pb-3 pr-2">
                               <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                                 <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-5 h-5 border-2 border-brand-navy/30 rounded-md checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
                                 <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
