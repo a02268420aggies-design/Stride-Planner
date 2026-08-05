@@ -173,8 +173,6 @@ const findTagNameByColor = (colorHex: string, tagsList: TagItem[]): string | nul
 
 
 
-const DragContext = React.createContext<any>(null);
-
 const ReorderableListItem = ({ item, className, isDraggingClass, children }: { item: any; className?: string; isDraggingClass?: string; children: React.ReactNode }) => {
   const dragControls = useDragControls();
 
@@ -183,28 +181,19 @@ const ReorderableListItem = ({ item, className, isDraggingClass, children }: { i
       value={item}
       dragListener={false}
       dragControls={dragControls}
-      className={cn(className, "relative")}
+      className={cn(className, "relative flex items-center group gap-2")}
     >
-      <DragContext.Provider value={dragControls}>
+      <div className="flex-1 min-w-0">
         {children}
-      </DragContext.Provider>
+      </div>
+      <div
+        onPointerDown={(e) => dragControls.start(e)}
+        style={{ touchAction: "none" }}
+        className="p-2 cursor-grab active:cursor-grabbing text-zinc-300 hover:text-zinc-500 transition-colors shrink-0 flex items-center justify-center"
+      >
+        <GripVertical className="w-5 h-5" />
+      </div>
     </Reorder.Item>
-  );
-};
-
-const DragHandle = () => {
-  const dragControls = React.useContext(DragContext);
-  return (
-    <div
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        dragControls.start(e);
-      }}
-      className="p-1.5 flex items-center justify-center cursor-grab active:cursor-grabbing text-zinc-300 hover:text-zinc-500 transition-colors touch-none"
-    >
-      <GripVertical className="w-5 h-5" />
-    </div>
   );
 };
 
@@ -4339,7 +4328,7 @@ export default function Home() {
                                 )}
                               </div>
                               {renderTagDot(task.tag_id)}
-                              <DragHandle />
+                              
                             </div>
         </motion.div>
       </div>
@@ -4506,7 +4495,7 @@ export default function Home() {
                                   )}
                                 </div>
                                 {renderTagDot(task.tag_id)}
-                              <DragHandle />
+                              
                               </div>
         </motion.div>
       </div>
