@@ -173,32 +173,34 @@ const findTagNameByColor = (colorHex: string, tagsList: TagItem[]): string | nul
 
 
 
+const DragContext = React.createContext<any>(null);
+
 const ReorderableListItem = ({ item, className, isDraggingClass, children }: { item: any; className?: string; isDraggingClass?: string; children: React.ReactNode }) => {
   const dragControls = useDragControls();
-  let holdTimeout: NodeJS.Timeout;
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    holdTimeout = setTimeout(() => {
-      dragControls.start(e);
-    }, 300);
-  };
-
-  const handlePointerUpOrLeave = () => {
-    clearTimeout(holdTimeout);
-  };
 
   return (
     <Reorder.Item
       value={item}
       dragListener={false}
       dragControls={dragControls}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUpOrLeave}
-      onPointerLeave={handlePointerUpOrLeave}
       className={cn(className, "relative")}
     >
-      {children}
+      <DragContext.Provider value={dragControls}>
+        {children}
+      </DragContext.Provider>
     </Reorder.Item>
+  );
+};
+
+const DragHandle = () => {
+  const dragControls = React.useContext(DragContext);
+  return (
+    <div
+      onPointerDown={(e) => dragControls.start(e)}
+      className="p-1.5 flex items-center justify-center cursor-grab active:cursor-grabbing text-zinc-300 hover:text-zinc-500 transition-colors touch-none"
+    >
+      <GripVertical className="w-5 h-5" />
+    </div>
   );
 };
 
@@ -4271,8 +4273,8 @@ export default function Home() {
 <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-brand-navy uppercase tracking-wider border-b-2 border-brand-navy/20 pb-1 w-full shrink-0">To Do's:</h2>
             </div>
-<div className="flex flex-col gap-4 flex-1 touch-pan-y">
-              <Reorder.Group as="div" values={todoRenderSlots} onReorder={(newOrder) => handleTodoReorder(newOrder, dateKey)} className="flex flex-col gap-4 flex-1 touch-pan-y">
+<div className="flex flex-col gap-4 flex-1 touch-pan-y overflow-hidden rounded-xl">
+              <Reorder.Group as="div" values={todoRenderSlots} onReorder={(newOrder) => handleTodoReorder(newOrder, dateKey)} className="flex flex-col gap-4 flex-1 touch-pan-y overflow-hidden rounded-xl">
                   {todoRenderSlots.map((task, i) => {
                     if (task && !("is_empty" in task)) {
                       return (
@@ -4333,6 +4335,7 @@ export default function Home() {
                                 )}
                               </div>
                               {renderTagDot(task.tag_id)}
+                              <DragHandle />
                             </div>
         </motion.div>
       </div>
@@ -4436,7 +4439,7 @@ export default function Home() {
                 <span className="text-xs font-normal text-zinc-400 normal-case bg-brand-sage/10 px-2 py-0.5 rounded-full">Top 5</span>
               </h2>
 <div className="flex flex-col gap-0 touch-pan-y">
-                <Reorder.Group as="div" values={priorityRenderSlots} onReorder={(newOrder) => handlePriorityReorder(newOrder, dateKey)} className="flex flex-col gap-0 w-full touch-pan-y">
+                <Reorder.Group as="div" values={priorityRenderSlots} onReorder={(newOrder) => handlePriorityReorder(newOrder, dateKey)} className="flex flex-col gap-0 w-full touch-pan-y overflow-hidden rounded-xl">
                     {priorityRenderSlots.map((task, i) => {
                       if (task && !("is_empty" in task)) {
                         return (
@@ -4499,6 +4502,7 @@ export default function Home() {
                                   )}
                                 </div>
                                 {renderTagDot(task.tag_id)}
+                              <DragHandle />
                               </div>
         </motion.div>
       </div>
@@ -4598,7 +4602,7 @@ export default function Home() {
                 />
               </form>
 <div className="flex flex-col gap-3 touch-pan-y">
-                <Reorder.Group as="div" values={goalRenderSlots} onReorder={(newOrder) => handleGoalReorder(newOrder, dateKey)} className="flex flex-col gap-3 w-full touch-pan-y">
+                <Reorder.Group as="div" values={goalRenderSlots} onReorder={(newOrder) => handleGoalReorder(newOrder, dateKey)} className="flex flex-col gap-3 w-full touch-pan-y overflow-hidden rounded-xl">
                     {goalRenderSlots.map((task, i) => {
                       if (task && !("is_empty" in task)) {
                         return (
