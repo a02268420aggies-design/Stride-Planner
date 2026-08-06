@@ -304,7 +304,6 @@ const TaskBankCard = ({
         )}
         <motion.div
           drag="x"
-          dragDirectionLock
           dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0}
           style={{ touchAction: 'pan-y' }}
@@ -4300,7 +4299,6 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragDirectionLock
           dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0}
           style={{ touchAction: 'pan-y' }}
@@ -4465,7 +4463,6 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragDirectionLock
           dragConstraints={{ left: -320, right: 0 }}
           dragElastic={0}
           style={{ touchAction: 'pan-y' }}
