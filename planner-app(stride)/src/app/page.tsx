@@ -187,11 +187,16 @@ const ReorderableListItem = ({ item, className, isDraggingClass, children }: { i
         {children}
       </div>
       <div
-        onPointerDown={(e) => dragControls.start(e)}
+        draggable={false}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dragControls.start(e);
+        }}
         style={{ touchAction: "none" }}
-        className="p-2 cursor-grab active:cursor-grabbing text-zinc-300 hover:text-zinc-500 transition-colors shrink-0 flex items-center justify-center"
+        className="w-14 h-full min-h-[48px] cursor-grab active:cursor-grabbing text-zinc-300 hover:text-brand-navy dark:hover:text-brand-sage transition-colors shrink-0 flex items-center justify-center touch-none"
       >
-        <GripVertical className="w-5 h-5" />
+        <GripVertical className="w-6 h-6 pointer-events-none" />
       </div>
     </Reorder.Item>
   );
