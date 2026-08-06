@@ -178,7 +178,7 @@ const ReorderableListItem = ({ item, className, isDraggingClass, children }: { i
 
   return (
     <Reorder.Item
-      value={item}
+      value={item.id}
       dragListener={false}
       dragControls={dragControls}
       className={cn(className, "relative flex items-center group gap-2")}
@@ -634,14 +634,15 @@ export default function Home() {
     setIsTouchDevice(typeof window !== 'undefined' && (window.matchMedia("(hover: none)").matches || navigator.maxTouchPoints > 0));
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const handleTodoReorder = (newOrder: any[], dateKey: string) => {
-    setDataStore(prev => {
-      const dayData = prev[dateKey] || getEmptyDay();
+  const handleTodoReorder = (newOrder: string[], dateKey: string) => {
+    setDataStore((prev: any) => {
+      const dayData = prev[dateKey];
+      if (!dayData || !dayData.items) return prev;
       const items = [...dayData.items];
       let rank = 0;
-      newOrder.forEach((item) => {
-        if (!("is_empty" in item)) {
-          const idx = items.findIndex(t => t.id === item.id);
+      newOrder.forEach((id) => {
+        if (!id.startsWith("empty-")) {
+          const idx = items.findIndex((t: any) => t.id === id);
           if (idx !== -1) items[idx] = { ...items[idx], todo_rank: rank++ };
         }
       });
@@ -649,14 +650,15 @@ export default function Home() {
     });
   };
 
-  const handlePriorityReorder = (newOrder: any[], dateKey: string) => {
-    setDataStore(prev => {
-      const dayData = prev[dateKey] || getEmptyDay();
+  const handlePriorityReorder = (newOrder: string[], dateKey: string) => {
+    setDataStore((prev: any) => {
+      const dayData = prev[dateKey];
+      if (!dayData || !dayData.items) return prev;
       const items = [...dayData.items];
       let rank = 0;
-      newOrder.forEach((item) => {
-        if (!("is_empty" in item)) {
-          const idx = items.findIndex(t => t.id === item.id);
+      newOrder.forEach((id) => {
+        if (!id.startsWith("empty-")) {
+          const idx = items.findIndex((t: any) => t.id === id);
           if (idx !== -1) items[idx] = { ...items[idx], priority_rank: rank++ };
         }
       });
@@ -664,14 +666,15 @@ export default function Home() {
     });
   };
 
-  const handleGoalReorder = (newOrder: any[], dateKey: string) => {
-    setDataStore(prev => {
-      const dayData = prev[dateKey] || getEmptyDay();
+  const handleGoalReorder = (newOrder: string[], dateKey: string) => {
+    setDataStore((prev: any) => {
+      const dayData = prev[dateKey];
+      if (!dayData || !dayData.items) return prev;
       const items = [...dayData.items];
       let rank = 0;
-      newOrder.forEach((item) => {
-        if (!("is_empty" in item)) {
-          const idx = items.findIndex(t => t.id === item.id);
+      newOrder.forEach((id) => {
+        if (!id.startsWith("empty-")) {
+          const idx = items.findIndex((t: any) => t.id === id);
           if (idx !== -1) items[idx] = { ...items[idx], goal_rank: rank++ };
         }
       });
@@ -4267,7 +4270,7 @@ export default function Home() {
               <h2 className="text-lg font-bold text-brand-navy uppercase tracking-wider border-b-2 border-brand-navy/20 pb-1 w-full shrink-0">To Do's:</h2>
             </div>
 <div className="flex flex-col gap-4 flex-1 touch-pan-y overflow-hidden rounded-xl">
-              <Reorder.Group as="div" values={todoRenderSlots} onReorder={(newOrder) => handleTodoReorder(newOrder, dateKey)} className="flex flex-col gap-4 flex-1 touch-pan-y overflow-hidden rounded-xl">
+              <Reorder.Group as="div" values={todoRenderSlots.map(t => t!.id)} onReorder={(newOrder) => handleTodoReorder(newOrder, dateKey)} className="flex flex-col gap-4 flex-1 touch-pan-y overflow-hidden rounded-xl">
                   {todoRenderSlots.map((task, i) => {
                     if (task && !("is_empty" in task)) {
                       return (
@@ -4432,7 +4435,7 @@ export default function Home() {
                 <span className="text-xs font-normal text-zinc-400 normal-case bg-brand-sage/10 px-2 py-0.5 rounded-full">Top 5</span>
               </h2>
 <div className="flex flex-col gap-0 touch-pan-y">
-                <Reorder.Group as="div" values={priorityRenderSlots} onReorder={(newOrder) => handlePriorityReorder(newOrder, dateKey)} className="flex flex-col gap-0 w-full touch-pan-y overflow-hidden rounded-xl">
+                <Reorder.Group as="div" values={priorityRenderSlots.map(t => t!.id)} onReorder={(newOrder) => handlePriorityReorder(newOrder, dateKey)} className="flex flex-col gap-0 w-full touch-pan-y overflow-hidden rounded-xl">
                     {priorityRenderSlots.map((task, i) => {
                       if (task && !("is_empty" in task)) {
                         return (
@@ -4595,7 +4598,7 @@ export default function Home() {
                 />
               </form>
 <div className="flex flex-col gap-3 touch-pan-y">
-                <Reorder.Group as="div" values={goalRenderSlots} onReorder={(newOrder) => handleGoalReorder(newOrder, dateKey)} className="flex flex-col gap-3 w-full touch-pan-y overflow-hidden rounded-xl">
+                <Reorder.Group as="div" values={goalRenderSlots.map(t => t!.id)} onReorder={(newOrder) => handleGoalReorder(newOrder, dateKey)} className="flex flex-col gap-3 w-full touch-pan-y overflow-hidden rounded-xl">
                     {goalRenderSlots.map((task, i) => {
                       if (task && !("is_empty" in task)) {
                         return (
