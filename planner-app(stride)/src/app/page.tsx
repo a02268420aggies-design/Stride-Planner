@@ -4340,7 +4340,7 @@ export default function Home() {
       </div>
 
       {/* Desktop Hover Action Tray */}
-                          <div className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
+                          <div className="hidden lg:flex absolute right-14 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
                             <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                             <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
                             {taskBank.some(t => t.id === task.master_id) && (
@@ -4506,7 +4506,7 @@ export default function Home() {
       </div>
 
       {/* Desktop Hover Action Tray */}
-                            <div className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
+                            <div className="hidden lg:flex absolute right-14 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
                               <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                               <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Remove Priority"><Star className="w-4 h-4 text-brand-sage fill-brand-sage" /></button>
                               {taskBank.some(t => t.id === task.master_id) && (
