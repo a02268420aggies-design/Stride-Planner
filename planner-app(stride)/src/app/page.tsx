@@ -4134,7 +4134,7 @@ export default function Home() {
         )}
       </AnimatePresence>
       {/* Floating Add Button */}
-      <button onClick={() => setIsModalOpen(true)} className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl flex items-center justify-center z-[250] hover:scale-105 active:scale-95 transition-transform group">
+      <button onClick={() => { setIsBankOpen(true); setIsModalOpen(true); }} className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl flex items-center justify-center z-[250] hover:scale-105 active:scale-95 transition-transform group">
         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
       </button>
 
