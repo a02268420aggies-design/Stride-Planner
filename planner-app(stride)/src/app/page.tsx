@@ -2920,7 +2920,7 @@ export default function Home() {
     <div className="flex min-h-screen justify-center bg-zinc-100 font-sans dark:bg-black p-4 sm:p-8 relative w-full">
 
       {/* Master Task Bank Slide-Out */}
-      <div className={cn("fixed top-0 right-0 h-full w-[400px] bg-white dark:bg-zinc-950 shadow-2xl border-l border-zinc-200 dark:border-zinc-800 transition-transform duration-300 z-50 flex flex-col pl-safe pb-safe", isBankOpen ? "translate-x-0" : "translate-x-full")}>
+      <div className={cn("fixed top-0 right-0 h-full w-[400px] bg-white dark:bg-zinc-950 shadow-2xl border-l border-zinc-200 dark:border-zinc-800 transition-transform duration-300 z-[100] flex flex-col pl-safe pb-safe pointer-events-auto", isBankOpen ? "translate-x-0" : "translate-x-full")}>
         <div className="flex flex-col gap-3 p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 drop-shadow-sm z-10 w-full shrink-0">
           <div className="flex items-center justify-between text-brand-navy dark:text-zinc-200">
             <div className="flex items-center gap-3">
@@ -3910,8 +3910,10 @@ export default function Home() {
 
       {/* Task Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <>
+          <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[40] backdrop-blur-sm pointer-events-auto" onClick={() => { setIsModalOpen(false); resetModal(); }} />
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
+            <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200 pointer-events-auto">
             <div className="flex justify-between items-center p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
               <h2 className="text-xl font-bold text-brand-navy dark:text-white">New Task</h2>
               <button onClick={() => { setIsModalOpen(false); resetModal(); }} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"><X className="w-5 h-5" /></button>
@@ -4050,6 +4052,7 @@ export default function Home() {
             </form>
           </div>
         </div>
+        </>
       )}
 
       {/* Recurring Dispatch Modal */}
