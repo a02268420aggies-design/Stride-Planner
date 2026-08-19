@@ -980,7 +980,7 @@ export default function Home() {
 
   const [expandedHeaders, setExpandedHeaders] = useState<string[]>([]);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
-  const [bankActiveTab, setBankActiveTab] = useState<'tasks' | 'routines'>('tasks');
+  const [bankActiveTab, setBankActiveTab] = useState<'tasks' | 'routines' | 'buffers' | 'meals'>('tasks');
   const [newMealName, setNewMealName] = useState("");
   const [newMealType, setNewMealType] = useState<MealType>("D");
   const [newMealIngs, setNewMealIngs] = useState("");
@@ -2929,9 +2929,11 @@ export default function Home() {
             </div>
             <button onClick={() => closeTaskBank()} className="p-2 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5" /></button>
           </div>
-          <div className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-2">
-            <button onClick={() => setBankActiveTab('tasks')} className={cn("px-4 py-2 text-sm font-bold border-b-2 transition-colors", bankActiveTab === 'tasks' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Tasks</button>
-            <button onClick={() => setBankActiveTab('routines')} className={cn("px-4 py-2 text-sm font-bold border-b-2 transition-colors", bankActiveTab === 'routines' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Routines</button>
+          <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-800 mt-2 overflow-x-auto custom-scrollbar pb-1">
+            <button onClick={() => setBankActiveTab('tasks')} className={cn("px-2 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap", bankActiveTab === 'tasks' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Tasks</button>
+            <button onClick={() => setBankActiveTab('routines')} className={cn("px-2 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap", bankActiveTab === 'routines' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Routines</button>
+            <button onClick={() => setBankActiveTab('buffers')} className={cn("px-2 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap", bankActiveTab === 'buffers' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Buffers</button>
+            <button onClick={() => setBankActiveTab('meals')} className={cn("px-2 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap", bankActiveTab === 'meals' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Meals</button>
           </div>
           {bankActiveTab === 'tasks' && (
             <div className="flex gap-2 items-center mt-3">
@@ -2951,7 +2953,7 @@ export default function Home() {
           className="flex-1 overflow-y-auto p-5 flex flex-col gap-8"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {bankActiveTab === 'routines' ? (
+          {bankActiveTab === 'routines' && (
             <div className="flex flex-col gap-4">
               {recurringTasks.length === 0 ? (
                 <div className="text-center text-zinc-500 mt-10 text-sm">No active routines. Create one in the New Task menu!</div>
@@ -2978,7 +2980,9 @@ export default function Home() {
                 ))
               )}
             </div>
-          ) : sortedTagKeys.length === 0 ? (
+          )}
+          {bankActiveTab === 'tasks' && (
+            sortedTagKeys.length === 0 ? (
             <div className="text-center text-zinc-500 mt-10 text-sm">No tasks in the bank.</div>
           ) : (
             sortedTagKeys.map(tagId => {
@@ -3060,27 +3064,112 @@ export default function Home() {
                 </div>
               );
             })
-          )}
-        </div>
-
-        {/* ── Meal Bank Accordion ── */}
-        <div className="flex flex-col gap-4 px-5 pb-5">
-          <button 
-            onClick={() => setExpandedHeaders(prev => prev.includes("meal-bank") ? prev.filter(k => k !== "meal-bank") : [...prev, "meal-bank"])}
-            className={cn(
-              "flex items-center gap-2 border-b pb-2 sticky top-0 z-10 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-sm transition-colors text-left",
-              expandedHeaders.includes("meal-bank") ? "border-slate-300 dark:border-slate-700" : "border-zinc-100 dark:border-zinc-800/50"
-            )}
-          >
-            <Utensils className="w-4 h-4 text-brand-sage" />
-            <h3 className={cn("text-sm font-bold uppercase tracking-widest", expandedHeaders.includes("meal-bank") ? "text-brand-navy dark:text-zinc-200" : "text-zinc-700 dark:text-zinc-400")}>Meal Bank</h3>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs font-semibold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md relative">{mealBank.length}</span>
-              <ChevronDown className={cn("w-4 h-4 text-zinc-400 transition-transform duration-300 shrink-0", expandedHeaders.includes("meal-bank") && "rotate-180")} />
-            </div>
-          </button>
+          ))}
           
-          {expandedHeaders.includes("meal-bank") && (() => {
+          {bankActiveTab === 'buffers' && (() => {
+             const weeklyBufferTasks = dataStore["BUFFER"]?.items || [];
+             const monthBufferKey = `MONTH_BUFFER_${currentMonthKey}`;
+             const monthlyBufferTasks = dataStore[monthBufferKey]?.items || [];
+             return (
+                <div className="flex flex-col gap-8 pb-8">
+                  {/* Weekly Buffer Section */}
+                  <div className="flex flex-col gap-4">
+                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-700 dark:text-zinc-400 border-b border-zinc-100 dark:border-zinc-800/50 pb-2">Weekly Buffer</h3>
+                     {weeklyBufferTasks.length === 0 ? (
+                        <div className="text-center text-zinc-500 mt-4 text-sm">No tasks in weekly buffer.</div>
+                     ) : (
+                        <div className="flex flex-col gap-3">
+                           {weeklyBufferTasks.map((taskItem) => {
+                               const masterTask = taskBank.find((t) => t.id === taskItem.master_id) || { ...taskItem, id: taskItem.master_id };
+                               return (
+                                 <TaskBankCard
+                                   key={taskItem.id}
+                                   task={masterTask}
+                                   schedulingState={schedulingStates[masterTask.id] || 'default'}
+                                   nudgeApproaching={false}
+                                   nudgeOverdue={false}
+                                   hasNudge={false}
+                                   viewMode={viewMode}
+                                   selectedWeekDate={selectedWeekDate}
+                                   dateKey={dateKey}
+                                   isPeekOpen={isPeekOpen}
+                                   peekDate={peekDate}
+                                   isMonthlyBufferExpanded={isMonthlyBufferExpanded}
+                                   currentMonthKey={currentMonthKey}
+                                   handleScheduleTask={handleScheduleTask}
+                                   activeNudgeDropdownId={activeNudgeDropdownId}
+                                   setActiveNudgeDropdownId={setActiveNudgeDropdownId}
+                                   activeTagDropdownId={activeTagDropdownId}
+                                   setActiveTagDropdownId={setActiveTagDropdownId}
+                                   tags={tags}
+                                   setTags={setTags}
+                                   currentDate={currentDate}
+                                   setDataStore={setDataStore}
+                                   setTaskBank={setTaskBank}
+                                   setRecurringModalTask={setRecurringModalTask}
+                                   archiveMasterTask={archiveMasterTask}
+                                   setCurrentDate={setCurrentDate}
+                                   setViewMode={setViewMode}
+                                   closeTaskBank={closeTaskBank}
+                                   setEditingTask={setEditingTask}
+                                 />
+                               );
+                           })}
+                        </div>
+                     )}
+                  </div>
+
+                  {/* Monthly Buffer Section */}
+                  <div className="flex flex-col gap-4">
+                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-700 dark:text-zinc-400 border-b border-zinc-100 dark:border-zinc-800/50 pb-2">Monthly Buffer</h3>
+                     {monthlyBufferTasks.length === 0 ? (
+                        <div className="text-center text-zinc-500 mt-4 text-sm">No tasks in monthly horizon.</div>
+                     ) : (
+                        <div className="flex flex-col gap-3">
+                           {monthlyBufferTasks.map((taskItem) => {
+                               const masterTask = taskBank.find((t) => t.id === taskItem.master_id) || { ...taskItem, id: taskItem.master_id };
+                               return (
+                                 <TaskBankCard
+                                   key={taskItem.id}
+                                   task={masterTask}
+                                   schedulingState={schedulingStates[masterTask.id] || 'default'}
+                                   nudgeApproaching={false}
+                                   nudgeOverdue={false}
+                                   hasNudge={false}
+                                   viewMode={viewMode}
+                                   selectedWeekDate={selectedWeekDate}
+                                   dateKey={dateKey}
+                                   isPeekOpen={isPeekOpen}
+                                   peekDate={peekDate}
+                                   isMonthlyBufferExpanded={isMonthlyBufferExpanded}
+                                   currentMonthKey={currentMonthKey}
+                                   handleScheduleTask={handleScheduleTask}
+                                   activeNudgeDropdownId={activeNudgeDropdownId}
+                                   setActiveNudgeDropdownId={setActiveNudgeDropdownId}
+                                   activeTagDropdownId={activeTagDropdownId}
+                                   setActiveTagDropdownId={setActiveTagDropdownId}
+                                   tags={tags}
+                                   setTags={setTags}
+                                   currentDate={currentDate}
+                                   setDataStore={setDataStore}
+                                   setTaskBank={setTaskBank}
+                                   setRecurringModalTask={setRecurringModalTask}
+                                   archiveMasterTask={archiveMasterTask}
+                                   setCurrentDate={setCurrentDate}
+                                   setViewMode={setViewMode}
+                                   closeTaskBank={closeTaskBank}
+                                   setEditingTask={setEditingTask}
+                                 />
+                               );
+                           })}
+                        </div>
+                     )}
+                  </div>
+                </div>
+             );
+          })()}
+
+          {bankActiveTab === 'meals' && (() => {
             const filteredAndSortedMeals = mealBank
               .filter(m => mealFilterType === "ALL" || m.type === mealFilterType)
               .filter(m => {
