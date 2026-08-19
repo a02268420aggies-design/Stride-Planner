@@ -2797,7 +2797,11 @@ export default function Home() {
                       </form>
                     ) : (
                       <button 
-                        onClick={() => setActiveInlineCol(colKey)}
+                        onClick={() => {
+                          setNewTaskDate(colKey);
+                          setIsBankOpen(true);
+                          setIsModalOpen(true);
+                        }}
                         className="w-full flex justify-center items-center gap-2 bg-zinc-50 dark:bg-zinc-900/50 border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-brand-navy/50 dark:hover:border-brand-navy/50 rounded-xl px-4 py-3 text-sm transition-all text-zinc-500 hover:text-brand-navy dark:hover:text-brand-sage font-medium group"
                       >
                          <Plus className="w-4 h-4 transition-transform group-hover:scale-125 group-hover:rotate-90" />
@@ -4006,7 +4010,9 @@ export default function Home() {
           <div className={cn("fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none transition-all duration-300", isBankOpen && "md:pr-80 lg:pr-96")}>
             <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200 pointer-events-auto">
             <div className="flex justify-between items-center p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-              <h2 className="text-xl font-bold text-brand-navy dark:text-white">New Task</h2>
+              <h2 className="text-xl font-bold text-brand-navy dark:text-white">
+                {newTaskDate && newTaskDate !== "BUFFER" && !newTaskDate.startsWith("MONTH_BUFFER") ? `Adding Task to ${new Date(newTaskDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long' })}` : 'New Task'}
+              </h2>
               <button onClick={() => { setIsModalOpen(false); resetModal(); }} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleAddTaskSubmit} className="flex flex-col gap-5 p-6">
@@ -4228,7 +4234,15 @@ export default function Home() {
         )}
       </AnimatePresence>
       {/* Floating Add Button */}
-      <button onClick={() => { setIsBankOpen(true); setIsModalOpen(true); }} className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl flex items-center justify-center z-[250] hover:scale-105 active:scale-95 transition-transform group">
+      <button onClick={() => { 
+        if (viewMode === 'week' && selectedWeekDate !== 'BUFFER') {
+          setNewTaskDate(selectedWeekDate);
+        } else {
+          setNewTaskDate(dateKey);
+        }
+        setIsBankOpen(true); 
+        setIsModalOpen(true); 
+      }} className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl flex items-center justify-center z-[250] hover:scale-105 active:scale-95 transition-transform group">
         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
       </button>
 
