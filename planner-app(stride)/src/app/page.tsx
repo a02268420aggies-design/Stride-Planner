@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Pl
 
 
 type TagItem = { id: string; name: string; color: string; };
-type RecurringTask = { id: string; text: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
+type RecurringTask = { id: string; text: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; startDate?: string; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
 type MasterTask = { id: string; text: string; is_priority: boolean; is_goal?: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
 type TaskItem = { id: string; master_id: string; text: string; is_done: boolean; is_priority: boolean; is_goal?: boolean; priority_rank?: number; todo_rank?: number; goal_rank?: number; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
 type DeletedTask = MasterTask & { deletedAt: string; };
@@ -1969,7 +1969,7 @@ export default function Home() {
       const newRecurring: RecurringTask = {
         id: `rt_${Date.now()}`, text: newTaskText.trim(), time: newTaskTime || undefined,
         tag_id: finalTagId || undefined, is_priority: newTaskPriority, is_goal: newTaskIsGoal,
-        daysOfWeek: newTaskRecurringDays, endDate: newTaskRecurringEnd || undefined,
+        daysOfWeek: newTaskRecurringDays, startDate: newTaskDate || dateKey, endDate: newTaskRecurringEnd || undefined,
         showOnWeek: newTaskShowOnWeek, showOnMonth: newTaskShowOnMonth
       };
       setRecurringTasks(prev => [...prev, newRecurring]);
@@ -2238,6 +2238,7 @@ export default function Home() {
     const dow = activeDate.getDay();
     recurringTasks.forEach(rt => {
       if (rt.daysOfWeek.includes(dow)) {
+        if (rt.startDate && activeDate < new Date(rt.startDate + 'T00:00:00')) return;
         if (rt.endDate && activeDate > new Date(rt.endDate + 'T00:00:00')) return;
         if (items.some(i => i.master_id === rt.id)) return;
         const compositeKey = `recur_${rt.id}_${dateKey}`;
@@ -2502,6 +2503,7 @@ export default function Home() {
         const dow = activeDate.getDay();
         recurringTasks.forEach(rt => {
           if (rt.showOnWeek && rt.daysOfWeek.includes(dow)) {
+            if (rt.startDate && activeDate < new Date(rt.startDate + 'T00:00:00')) return;
             if (rt.endDate && activeDate > new Date(rt.endDate + 'T00:00:00')) return;
             if (items.some(i => i.master_id === rt.id)) return;
             const compositeKey = `recur_${rt.id}_${colKey}`;
@@ -2969,6 +2971,7 @@ export default function Home() {
                     <div className="text-xs text-zinc-500 font-semibold flex flex-wrap gap-x-4 gap-y-1">
                       <span>Days: {rt.daysOfWeek.map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(', ')}</span>
                       {rt.time && <span>Time: {rt.time}</span>}
+                      {rt.startDate && <span>Starts: {rt.startDate}</span>}
                       {rt.endDate && <span className="text-amber-600">Ends: {rt.endDate}</span>}
                     </div>
                     <div className="text-[10px] uppercase font-bold text-zinc-400 mt-1 flex gap-3">
@@ -5189,6 +5192,7 @@ export default function Home() {
                           const dow = mActiveDate.getDay();
                           recurringTasks.forEach(rt => {
                             if (rt.showOnMonth && rt.daysOfWeek.includes(dow)) {
+                              if (rt.startDate && mActiveDate < new Date(rt.startDate + 'T00:00:00')) return;
                               if (rt.endDate && mActiveDate > new Date(rt.endDate + 'T00:00:00')) return;
                               if (dayItems.some(i => i.master_id === rt.id)) return;
                               const compositeKey = `recur_${rt.id}_${mKey}`;
