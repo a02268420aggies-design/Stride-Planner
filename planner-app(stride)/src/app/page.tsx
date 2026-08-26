@@ -278,7 +278,7 @@ const TaskBankCard = ({
     >
             <div className="relative overflow-hidden isolate w-full">
         {isTouchDevice && (
-          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[320px]">
+          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[384px]">
            <button onClick={() => setEditingTask(task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
            <button onClick={() => setLocalPriority(!localPriority)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Toggle Priority"><Star className={cn("w-5 h-5", localPriority && "text-brand-sage fill-brand-sage")} /></button>
            <button onClick={(e) => { 
@@ -299,7 +299,7 @@ const TaskBankCard = ({
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -320, right: 0 }}
+          dragConstraints={{ left: -384, right: 0 }}
           dragElastic={0}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -4388,7 +4388,7 @@ export default function Home() {
                         )}>
                                 <div className="relative overflow-hidden isolate w-full">
         {isTouchDevice && (
-          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[320px]">
+          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[256px]">
 
                                <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
                                <button onClick={() => toggleDayTaskPriority(task.id)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Make Priority"><Star className="w-5 h-5" /></button>
@@ -4403,7 +4403,7 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -320, right: 0 }}
+          dragConstraints={{ left: -256, right: 0 }}
           dragElastic={0}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
@@ -4552,7 +4552,7 @@ export default function Home() {
                           )}>
                                   <div className="relative overflow-hidden isolate w-full">
         {isTouchDevice && (
-          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[320px]">
+          <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[256px]">
 
                                  <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
                                  <button onClick={() => toggleDayTaskPriority(task.id)} className="flex-1 flex items-center justify-center text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Remove Priority"><Star className="w-5 h-5 fill-brand-sage" /></button>
@@ -4567,7 +4567,7 @@ export default function Home() {
         )}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -320, right: 0 }}
+          dragConstraints={{ left: -256, right: 0 }}
           dragElastic={0}
           style={{ touchAction: 'pan-y' }}
           className="relative z-10 w-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl"
