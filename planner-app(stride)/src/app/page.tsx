@@ -1140,6 +1140,14 @@ export default function Home() {
     try { localStorage.setItem('stride-deleted-tasks', JSON.stringify(deletedTasks)); } catch {}
   }, [deletedTasks]);
 
+  useEffect(() => {
+    try { localStorage.setItem('stride_recurringTasks', JSON.stringify(recurringTasks)); } catch {}
+  }, [recurringTasks]);
+
+  useEffect(() => {
+    try { localStorage.setItem('stride_completedRoutines', JSON.stringify(completedRoutines)); } catch {}
+  }, [completedRoutines]);
+
   const [weeklyGoals, setWeeklyGoals] = useState<Record<string, [string, string, string]>>(() => {
     try {
       const saved = localStorage.getItem('stride-weekly-goals');
