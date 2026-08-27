@@ -11,9 +11,9 @@ import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Pl
 
 
 type TagItem = { id: string; name: string; color: string; };
-type RecurringTask = { id: string; text: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; startDate?: string; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
-type MasterTask = { id: string; text: string; is_priority: boolean; is_goal?: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
-type TaskItem = { id: string; master_id: string; text: string; is_done: boolean; is_priority: boolean; is_goal?: boolean; priority_rank?: number; todo_rank?: number; goal_rank?: number; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
+type RecurringTask = { id: string; text?: string; title?: string; name?: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; startDate?: string; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
+type MasterTask = { id: string; text?: string; title?: string; name?: string; is_priority: boolean; is_goal?: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
+type TaskItem = { id: string; master_id: string; text?: string; title?: string; name?: string; is_done: boolean; is_priority: boolean; is_goal?: boolean; priority_rank?: number; todo_rank?: number; goal_rank?: number; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
 type DeletedTask = MasterTask & { deletedAt: string; };
 
 type MealType = "B" | "L" | "D" | "S";
@@ -312,7 +312,7 @@ const TaskBankCard = ({
             </button>
             <div className="flex-1 flex flex-col gap-0.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span onClick={() => setEditingTask(task)} className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer rounded px-1 transition-colors">{task.text}</span>
+                <span onClick={() => setEditingTask(task)} className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer rounded px-1 transition-colors">{task.title || task.text || task.name || "Untitled Task"}</span>
                 {(task.dueDate || task.due_date) && (
                   <button 
                     onClick={(e) => {
@@ -523,7 +523,7 @@ const TaskBankCard = ({
   );
 };
 const EditTaskModal = ({ task, tags, onSave, onClose }: { task: MasterTask, tags: TagItem[], onSave: (t: MasterTask) => void, onClose: () => void }) => {
-  const [text, setText] = useState(task.text);
+  const [text, setText] = useState(task.title || task.text || task.name || "");
   const [dueDate, setDueDate] = useState(task.due_date || task.dueDate || "");
   const [tagId, setTagId] = useState(task.tag_id || "");
   const [nudgeDate, setNudgeDate] = useState(task.nudgeDate ? new Date(task.nudgeDate).toISOString().slice(0, 16) : "");
@@ -1640,7 +1640,7 @@ export default function Home() {
 
     if (task && willBecomeDone && task.tag_id === goalsTagId) {
       const currentWeekGoals = weeklyGoals[weekDateKeys[0]] || ["", "", ""];
-      const matchIdx = currentWeekGoals.findIndex(g => g.trim().toLowerCase() === task.text.trim().toLowerCase() && g.trim() !== "");
+      const matchIdx = currentWeekGoals.findIndex(g => g.trim().toLowerCase() === (task.title || task.text || task.name || "").trim().toLowerCase() && g.trim() !== "");
       if (matchIdx !== -1) {
         setWeeklyGoalHits(prev => {
           const currentHits = prev[weekDateKeys[0]] || [0, 0, 0];
@@ -2296,7 +2296,7 @@ export default function Home() {
       if (bankFilterTagId === "untagged" && !isUntagged) return false;
       if (bankFilterTagId !== "untagged" && task.tag_id !== bankFilterTagId) return false;
     }
-    if (bankSearchQuery.trim() && !task.text.toLowerCase().includes(bankSearchQuery.toLowerCase())) return false;
+    if (bankSearchQuery.trim() && !(task.title || task.text || task.name || "").toLowerCase().includes(bankSearchQuery.toLowerCase())) return false;
     return true;
   });
   filteredBank.forEach(task => {
@@ -2665,7 +2665,7 @@ export default function Home() {
                              {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
                            </div>
                            <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
-                             {task.text}
+                             {task.title || task.text || task.name || "Untitled Task"}
                            </span>
                            {task.time && (
                              <span className={cn(
@@ -2838,7 +2838,7 @@ export default function Home() {
                             return mbItems.map(task => (
                                <div key={task.id} className="flex items-center gap-3 p-2.5 bg-zinc-100/50 dark:bg-zinc-800/20 border border-zinc-200/50 dark:border-zinc-800/50 rounded-lg group relative hover:border-brand-navy/30 dark:hover:border-brand-sage/40 transition-all">
                                   {renderTagDot(task.tag_id)}
-                                  <span className="text-[13px] font-semibold text-zinc-700 dark:text-zinc-300 flex-1 truncate">{task.text}</span>
+                                  <span className="text-[13px] font-semibold text-zinc-700 dark:text-zinc-300 flex-1 truncate">{task.title || task.text || task.name || "Untitled Task"}</span>
                                   <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 pl-2 backdrop-blur-md rounded-l-md shadow-sm">
                                     <button onClick={(e) => {
                                       e.stopPropagation();
@@ -2884,7 +2884,7 @@ export default function Home() {
                 )}>
                    {renderTagDot(task.tag_id)}
                    <span className={cn("text-[13px] font-semibold leading-none text-zinc-800 dark:text-zinc-200 truncate", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
-                     {task.text}
+                     {task.title || task.text || task.name || "Untitled Task"}
                    </span>
                    {task.time && (
                      <span className={cn(
@@ -3417,7 +3417,7 @@ export default function Home() {
                   return (
                     <div key={task.id} className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg group">
                       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400 truncate line-through">{task.text}</span>
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400 truncate line-through">{task.title || task.text || task.name || "Untitled Task"}</span>
                         <span className="text-[10px] text-zinc-400 font-mono">
                           {expiresIn <= 1 ? "Expires today" : `${expiresIn}d left`}
                         </span>
@@ -3824,7 +3824,7 @@ export default function Home() {
                  <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm gap-4">
                    <div className="flex items-center gap-3">
                      <Star className={cn("w-4 h-4 shrink-0 mt-0.5 sm:mt-0", task.is_priority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
-                     <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">{task.text}</span>
+                     <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">{task.title || task.text || task.name || "Untitled Task"}</span>
                    </div>
                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                       <button 
@@ -3866,7 +3866,7 @@ export default function Home() {
                              };
                            });
                            
-                           const mTask: MasterTask = { id: task.master_id, text: task.text, is_priority: task.is_priority, tag_id: task.tag_id, reminderTime: task.reminderTime, isReminderActive: task.isReminderActive };
+                           const mTask: MasterTask = { id: task.master_id, text: task.title || task.text || task.name || "Untitled Task", is_priority: task.is_priority, tag_id: task.tag_id, reminderTime: task.reminderTime, isReminderActive: task.isReminderActive };
                            setTaskBank(prev => [...prev, mTask]);
                            
                            setMonthlyReviewTasks(prev => {
@@ -3930,7 +3930,7 @@ export default function Home() {
                           className={cn("flex flex-col gap-3 p-3.5 border rounded-xl shadow-sm transition-all select-none cursor-pointer hover:border-brand-navy/30 dark:hover:border-brand-sage/40", bubbleColor, animatingBufferId === task.id && "-translate-x-8 opacity-0")}
                         >
                           <div className="flex items-start gap-3">
-                            <span className="text-sm font-semibold flex-1 leading-snug">{task.text}</span>
+                            <span className="text-sm font-semibold flex-1 leading-snug">{task.title || task.text || task.name || "Untitled Task"}</span>
                             {!isGoal && (
                               <div className="flex items-center gap-1 shrink-0">
                                 <button 
@@ -3991,7 +3991,7 @@ export default function Home() {
                           className={cn("flex flex-col gap-3 p-3.5 border rounded-xl shadow-sm transition-all select-none cursor-pointer hover:border-brand-navy/30 dark:hover:border-brand-sage/40", bubbleColor)}
                         >
                           <div className="flex items-start gap-3">
-                            <span className="text-sm font-semibold flex-1 leading-snug">{task.text}</span>
+                            <span className="text-sm font-semibold flex-1 leading-snug">{task.title || task.text || task.name || "Untitled Task"}</span>
                             {!isGoal && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); toggleHuddlePriority(task.id, 'BUFFER'); }}
@@ -4213,7 +4213,7 @@ export default function Home() {
           <div className="bg-white dark:bg-zinc-950 border border-brand-navy/20 w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
               <h2 className="text-xl font-bold text-brand-navy dark:text-brand-sage">Repeat Task</h2>
-              <p className="text-sm text-zinc-500 font-semibold mt-1">"{recurringModalTask.text}"</p>
+              <p className="text-sm text-zinc-500 font-semibold mt-1">"{recurringModalTask.title || recurringModalTask.text || recurringModalTask.name || "Untitled Task"}"</p>
             </div>
             <div className="p-6 flex flex-col gap-6">
               <div>
@@ -4474,7 +4474,7 @@ export default function Home() {
                                 <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                               </div>
                               <div className="flex-1 flex flex-col min-w-0">
-                                <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                                <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.title || task.text || task.name || "Untitled Task"}</span>
                                 {task.time && (
                                   <span className={cn(
                                     "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
@@ -4641,7 +4641,7 @@ export default function Home() {
                                   <span className="font-mono text-lg font-bold text-brand-sage/60 w-6 shrink-0 text-center">{i + 1}</span>
                                 </div>
                                 <div className="flex-1 flex flex-col cursor-pointer overflow-hidden min-w-0">
-                                  <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                                  <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.title || task.text || task.name || "Untitled Task"}</span>
                                   {task.time && (
                                     <span className={cn(
                                       "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
@@ -4772,7 +4772,7 @@ export default function Home() {
                               <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-zinc-400 checked:border-zinc-400 transition-all cursor-pointer" />
                               <svg className="absolute w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <span className={cn("text-base transition-all flex-1 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.text}</span>
+                            <span className={cn("text-base transition-all flex-1 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.title || task.text || task.name || "Untitled Task"}</span>
                             <button onClick={() => removeDayTask(task.id, task.master_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-all"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                           </ReorderableListItem>
                         );
@@ -5418,7 +5418,7 @@ export default function Home() {
                                     {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
                                   </div>
                                   <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
-                                    {task.text}
+                                    {task.title || task.text || task.name || "Untitled Task"}
                                   </span>
                                </div>
                                <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 pl-2 backdrop-blur-sm rounded-l-md">
