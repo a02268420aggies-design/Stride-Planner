@@ -3732,7 +3732,7 @@ export default function Home() {
                       ) : (
                         bufferItems.map(item => (
                           <div key={item.id} className="flex flex-col p-5 rounded-3xl border border-white/5 bg-white/[0.02] gap-4 shadow-sm hover:shadow-md hover:bg-white/[0.04] transition-all">
-                            <span className="text-base font-bold text-white leading-snug">{item.text}</span>
+                            <span className="text-base font-bold text-white leading-snug">{item.title || item.text || item.name || "Untitled Task"}</span>
                             <div className="flex items-center justify-end gap-2 mt-2">
                               <button onClick={() => returnBufferTaskToBank(item.id)} className="px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-all">Remove Flag</button>
                               <button onClick={() => moveBufferTaskToMonday(item)} className="px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-brand-sage text-brand-navy shadow-lg hover:scale-105 transition-all">Move to Monday</button>
