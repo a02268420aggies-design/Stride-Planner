@@ -17,7 +17,7 @@ type TaskItem = { id: string; master_id: string; text?: string; title?: string; 
 type DeletedTask = MasterTask & { deletedAt: string; };
 
 type MealType = "B" | "L" | "D" | "S";
-type MealEntry = { id: string; type: MealType; text: string; };
+type MealEntry = { id: string; type: MealType; text?: string; title?: string; name?: string; };
 type MealItem = { id: string; name: string; type: MealType; ingredients: string[]; planCount?: number; };
 type GroceryItem = { id: string; name: string; isGhost: boolean; is_bought: boolean; sourceMealId?: string };
 type GroceryStoreWeek = { items: GroceryItem[]; dismissedGhosts: string[] };
@@ -1247,7 +1247,7 @@ export default function Home() {
       totalTasks += total;
       totalCompleted += completed;
 
-      const pItems = items.filter(t => t.is_priority && t.tag_id !== goalsTagId);
+      const pItems = items.filter(t => t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId));
       totalPriorities += pItems.length;
       totalCompletedPriorities += pItems.filter(t => t.is_done).length;
 
@@ -2247,7 +2247,7 @@ export default function Home() {
         if (items.some(i => i.master_id === rt.id)) return;
         const compositeKey = `recur_${rt.id}_${dateKey}`;
         items.push({
-          id: compositeKey, master_id: rt.id, text: rt.text, is_done: !!completedRoutines[compositeKey],
+          id: compositeKey, master_id: rt.id, text: (rt.title || rt.text || rt.name || "Untitled"), is_done: !!completedRoutines[compositeKey],
           is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
         });
       }
@@ -2255,9 +2255,9 @@ export default function Home() {
     return items;
   }, [dayData.items, dateKey, recurringTasks, completedRoutines]);
 
-  const goalsArray = computedDailyItems.filter(t => t.tag_id === goalsTagId);
-  const prioritiesArray = computedDailyItems.filter(t => t.is_priority && t.tag_id !== goalsTagId);
-  const tasksArray = computedDailyItems.filter(t => !t.is_priority && t.tag_id !== goalsTagId);
+  const goalsArray = computedDailyItems.filter(t => goalsTagId && t.tag_id === goalsTagId);
+  const prioritiesArray = computedDailyItems.filter(t => t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId));
+  const tasksArray = computedDailyItems.filter(t => !t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId));
   const getMealText = (type: MealType) => dayData.meals.find(m => m.type === type)?.text || "";
 
   let unrankedPriorities = prioritiesArray.filter(t => t.priority_rank === undefined);
@@ -2512,26 +2512,26 @@ export default function Home() {
             if (items.some(i => i.master_id === rt.id)) return;
             const compositeKey = `recur_${rt.id}_${colKey}`;
             items.push({
-              id: compositeKey, master_id: rt.id, text: rt.text, is_done: !!completedRoutines[compositeKey],
+              id: compositeKey, master_id: rt.id, text: (rt.title || rt.text || rt.name || "Untitled"), is_done: !!completedRoutines[compositeKey],
               is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
             } as any);
           }
         });
     }
 
-    const tCompleted = items.filter(t => t.is_done && !t.is_priority && t.tag_id !== goalsTagId).length;
-    const tTotal = items.filter(t => !t.is_priority && t.tag_id !== goalsTagId).length;
-    const pCompleted = items.filter(t => t.is_done && t.is_priority && t.tag_id !== goalsTagId).length;
-    const pTotal = items.filter(t => t.is_priority && t.tag_id !== goalsTagId).length;
-    const gCompleted = items.filter(t => t.is_done && t.tag_id === goalsTagId).length;
-    const gTotal = items.filter(t => t.tag_id === goalsTagId).length;
+    const tCompleted = items.filter(t => t.is_done && !t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)).length;
+    const tTotal = items.filter(t => !t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)).length;
+    const pCompleted = items.filter(t => t.is_done && t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)).length;
+    const pTotal = items.filter(t => t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)).length;
+    const gCompleted = items.filter(t => t.is_done && goalsTagId && t.tag_id === goalsTagId).length;
+    const gTotal = items.filter(t => goalsTagId && t.tag_id === goalsTagId).length;
 
     const ghosts = isBuffer ? [] : taskBank.filter(t => t.due_date === colKey && !items.some(i => i.master_id === t.id) && !dismissedGhosts[colKey]?.includes(t.id));
     const isExpanded = expandedDays.includes(colKey);
 
     const top5Items = [
-      ...items.filter(t => t.is_priority && t.tag_id !== goalsTagId),
-      ...items.filter(t => t.tag_id === goalsTagId),
+      ...items.filter(t => t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)),
+      ...items.filter(t => goalsTagId && t.tag_id === goalsTagId),
       ...items.filter(t => !t.is_priority && t.tag_id !== goalsTagId && t.time),
       ...items.filter(t => !t.is_priority && t.tag_id !== goalsTagId && !t.time)
     ].slice(0, 5);
@@ -2642,7 +2642,7 @@ export default function Home() {
                        }}
                        className={cn("flex items-start gap-3 p-3.5 bg-white dark:bg-zinc-900 border rounded-xl hover:shadow-md transition-shadow group relative", 
                          task.is_done && "opacity-50",
-                         task.is_priority && task.tag_id !== goalsTagId ? "border-brand-sage dark:border-brand-sage/50" : task.tag_id === goalsTagId ? "border-slate-300 dark:border-slate-600" : "border-brand-navy border-opacity-30 dark:border-brand-navy/60"
+                         task.is_priority && (!goalsTagId || task.tag_id !== goalsTagId) ? "border-brand-sage dark:border-brand-sage/50" : (goalsTagId && task.tag_id === goalsTagId) ? "border-slate-300 dark:border-slate-600" : "border-brand-navy border-opacity-30 dark:border-brand-navy/60"
                        )}
                      >
                         {!isBuffer && (
@@ -2661,7 +2661,7 @@ export default function Home() {
                         <div className="flex-1 flex items-center min-w-0 pr-8">
                            <div className="flex items-center gap-2 mt-0.5 shrink-0">
                              {renderTagDot(task.tag_id)}
-                             {(task.is_goal || task.tag_id === goalsTagId) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
+                             {(task.is_goal || (goalsTagId && task.tag_id === goalsTagId)) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
                              {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
                            </div>
                            <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
@@ -2708,7 +2708,7 @@ export default function Home() {
                     >
                        <Star className={cn("w-4 h-4 mt-0.5 shrink-0", ghost.is_priority ? "text-amber-500 fill-amber-500" : "text-zinc-300 dark:text-zinc-700")} />
                        <div className="flex-1 flex items-center min-w-0 pr-8">
-                          <span className="text-sm font-semibold leading-snug text-zinc-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">{ghost.text}</span>
+                          <span className="text-sm font-semibold leading-snug text-zinc-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">{ghost.title || ghost.text || ghost.name || "Untitled"}</span>
                           {ghost.time && (
                             <span className="text-xs font-bold font-mono ml-auto shrink-0 tracking-tight text-amber-600/60 dark:text-amber-500/60 group-hover:text-amber-600">
                                {ghost.time}
@@ -2880,7 +2880,7 @@ export default function Home() {
               return (
                 <div key={`preview_${task.id}`} className={cn("flex items-center gap-2.5 px-3 py-2 bg-white/50 dark:bg-zinc-900/30 border rounded-lg", 
                   task.is_done && "opacity-50",
-                  task.is_priority && task.tag_id !== goalsTagId ? "border-brand-sage dark:border-brand-sage/50" : task.tag_id === goalsTagId ? "border-slate-300 dark:border-slate-600" : "border-brand-navy border-opacity-30 dark:border-brand-navy/60"
+                  task.is_priority && (!goalsTagId || task.tag_id !== goalsTagId) ? "border-brand-sage dark:border-brand-sage/50" : (goalsTagId && task.tag_id === goalsTagId) ? "border-slate-300 dark:border-slate-600" : "border-brand-navy border-opacity-30 dark:border-brand-navy/60"
                 )}>
                    {renderTagDot(task.tag_id)}
                    <span className={cn("text-[13px] font-semibold leading-none text-zinc-800 dark:text-zinc-200 truncate", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
@@ -2909,7 +2909,7 @@ export default function Home() {
                 title="Double click to solidify"
               >
                  <Star className={cn("w-3.5 h-3.5 shrink-0", ghost.is_priority ? "text-amber-500 fill-amber-500" : "text-zinc-300 dark:text-zinc-700")} />
-                 <span className="text-[13px] font-semibold leading-none text-zinc-600 dark:text-zinc-400 truncate">{ghost.text}</span>
+                 <span className="text-[13px] font-semibold leading-none text-zinc-600 dark:text-zinc-400 truncate">{ghost.title || ghost.text || ghost.name || "Untitled"}</span>
                  {ghost.time && (
                    <span className="text-[11px] font-bold font-mono ml-auto shrink-0 tracking-tight text-amber-600/60 dark:text-amber-500/60">
                       {ghost.time}
@@ -2971,7 +2971,7 @@ export default function Home() {
                   <div key={rt.id} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{rt.text}</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{(rt.title || rt.text || rt.name || "Untitled")}</span>
                         {rt.tag_id && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tagsById[rt.tag_id]?.color }} />}
                       </div>
                       <button onClick={() => setRecurringTasks(prev => prev.filter(r => r.id !== rt.id))} className="text-xs font-bold px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">Delete / End Routine</button>
@@ -3919,7 +3919,7 @@ export default function Home() {
                   </p>
                   <div className="flex flex-col gap-2">
                     {huddleYesterdayItems.map(task => {
-                      const isGoal = task.tag_id === goalsTagId;
+                      const isGoal = goalsTagId && task.tag_id === goalsTagId;
                       const isPriority = task.is_priority && !isGoal;
                       const bubbleColor = isGoal ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200" : isPriority ? "bg-brand-sage/10 text-brand-sage border-brand-sage/20" : "bg-brand-navy/5 text-brand-navy dark:border-brand-navy/20 border-brand-navy/10";
                       
@@ -3980,7 +3980,7 @@ export default function Home() {
                   </p>
                   <div className="flex flex-col gap-2">
                     {huddleBufferItems.map(task => {
-                      const isGoal = task.tag_id === goalsTagId;
+                      const isGoal = goalsTagId && task.tag_id === goalsTagId;
                       const isPriority = task.is_priority && !isGoal;
                       const bubbleColor = isGoal ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200" : isPriority ? "bg-brand-sage/10 text-brand-sage border-brand-sage/20" : "bg-brand-navy/5 text-brand-navy dark:border-brand-navy/20 border-brand-navy/10";
                       
@@ -4544,7 +4544,7 @@ export default function Home() {
                 const d = new Date(currentDateObj);
                 d.setDate(d.getDate() - i);
                 const dk = getDateKey(d);
-                (dataStore[dk]?.meals || []).forEach(m => recentMeals.add(m.text.toLowerCase()));
+                (dataStore[dk]?.meals || []).forEach(m => recentMeals.add((m.title || m.text || m.name || "").toLowerCase()));
               }
 
               const intelligentSuggestions = mealBank
@@ -5264,7 +5264,7 @@ export default function Home() {
                               if (dayItems.some(i => i.master_id === rt.id)) return;
                               const compositeKey = `recur_${rt.id}_${mKey}`;
                               dayItems.push({
-                                id: compositeKey, master_id: rt.id, text: rt.text, is_done: !!completedRoutines[compositeKey],
+                                id: compositeKey, master_id: rt.id, text: (rt.title || rt.text || rt.name || "Untitled"), is_done: !!completedRoutines[compositeKey],
                                 is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
                               } as any);
                             }
@@ -5351,7 +5351,7 @@ export default function Home() {
                                        <div key={idx} className="flex items-center gap-1.5 w-full max-w-full">
                                          <div className="w-1.5 h-1.5 rounded-full shrink-0 animate-in zoom-in duration-300 fill-mode-both" style={{ backgroundColor: tagsById[pri.tag_id as string]?.color || '#94a3b8' }} />
                                          <span className={cn("text-[9px] font-bold truncate leading-none pt-[1px]", pri.is_done ? "line-through text-zinc-400 dark:text-zinc-600/50" : "text-zinc-600 dark:text-zinc-400")}>
-                                           {pri.text}
+                                           {pri.title || pri.text || pri.name || "Untitled"}
                                          </span>
                                        </div>
                                     ))}
@@ -5398,7 +5398,7 @@ export default function Home() {
                                key={task.id} 
                                className={cn("flex items-start gap-3 p-3.5 bg-white dark:bg-zinc-900 border rounded-xl hover:shadow-md transition-shadow group relative", 
                                  task.is_done && "opacity-50",
-                                 task.is_priority && task.tag_id !== goalsTagId ? "border-brand-sage dark:border-brand-sage/50" : task.tag_id === goalsTagId ? "border-slate-300 dark:border-slate-600" : "border-brand-navy border-opacity-30 dark:border-brand-navy/60"
+                                 task.is_priority && (!goalsTagId || task.tag_id !== goalsTagId) ? "border-brand-sage dark:border-brand-sage/50" : (goalsTagId && task.tag_id === goalsTagId) ? "border-slate-300 dark:border-slate-600" : "border-brand-navy border-opacity-30 dark:border-brand-navy/60"
                                )}
                              >
                                <div className="relative flex items-center justify-center mt-0.5 shrink-0">
@@ -5414,7 +5414,7 @@ export default function Home() {
                                <div className="flex-1 flex items-center min-w-0 pr-8">
                                   <div className="flex items-center gap-2 mt-0.5 shrink-0">
                                     {renderTagDot(task.tag_id)}
-                                    {(task.is_goal || task.tag_id === goalsTagId) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
+                                    {(task.is_goal || (goalsTagId && task.tag_id === goalsTagId)) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
                                     {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
                                   </div>
                                   <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
@@ -5522,7 +5522,7 @@ export default function Home() {
                     return topPri.map((p: any) => (
                       <div key={p.id} className="flex items-center gap-3 bg-white dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl shadow-sm">
                          <div className={cn("w-4 h-4 rounded-full border-2 shrink-0 transition-colors", p.is_done ? "bg-brand-sage border-brand-sage" : "border-zinc-300 dark:border-zinc-600")} />
-                         <span className={cn("text-sm font-semibold truncate", p.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-200")}>{p.text}</span>
+                         <span className={cn("text-sm font-semibold truncate", p.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-200")}>{p.title || p.text || p.name || "Untitled"}</span>
                          <div className="ml-auto w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tagsById[p.tag_id as string]?.color || '#94a3b8' }} />
                       </div>
                     ));
