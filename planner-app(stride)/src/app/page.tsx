@@ -637,7 +637,7 @@ export default function Home() {
     setDataStore((prev: any) => {
       const dayData = prev[dateKey];
       if (!dayData || !dayData.items) return prev;
-      const items = [...dayData.items];
+      const items = [...dayData.items].filter((i: any) => i.isGhost !== true);
       let rank = 0;
       newOrder.forEach((id) => {
         if (!id.startsWith("empty-")) {
@@ -653,7 +653,7 @@ export default function Home() {
     setDataStore((prev: any) => {
       const dayData = prev[dateKey];
       if (!dayData || !dayData.items) return prev;
-      const items = [...dayData.items];
+      const items = [...dayData.items].filter((i: any) => i.isGhost !== true);
       let rank = 0;
       newOrder.forEach((id) => {
         if (!id.startsWith("empty-")) {
@@ -669,7 +669,7 @@ export default function Home() {
     setDataStore((prev: any) => {
       const dayData = prev[dateKey];
       if (!dayData || !dayData.items) return prev;
-      const items = [...dayData.items];
+      const items = [...dayData.items].filter((i: any) => i.isGhost !== true);
       let rank = 0;
       newOrder.forEach((id) => {
         if (!id.startsWith("empty-")) {
@@ -2236,14 +2236,14 @@ export default function Home() {
   };
 
   const computedDailyItems = useMemo(() => {
-    const items = [...dayData.items];
+    const items = [...dayData.items].filter((i: any) => i.isGhost !== true);
     if (dateKey === "BUFFER" || dateKey.startsWith("BUFFER_")) return items;
     const activeDate = new Date(dateKey + 'T00:00:00');
     const dow = activeDate.getDay();
     recurringTasks.forEach(rt => {
       if (rt.daysOfWeek.includes(dow)) {
-        if (rt.startDate && activeDate < new Date(rt.startDate + 'T00:00:00')) return;
-        if (rt.endDate && activeDate > new Date(rt.endDate + 'T00:00:00')) return;
+        if (rt.startDate && dateKey < rt.startDate) return;
+        if (rt.endDate && dateKey > rt.endDate) return;
         if (items.some(i => i.master_id === rt.id)) return;
         const compositeKey = `recur_${rt.id}_${dateKey}`;
         items.push({
@@ -2252,6 +2252,7 @@ export default function Home() {
         });
       }
     });
+    console.log("Selected Day:", dateKey, "Filtered Tasks:", items);
     return items;
   }, [dayData.items, dateKey, recurringTasks, completedRoutines]);
 
@@ -2501,14 +2502,14 @@ export default function Home() {
     const isToday = colKey === getDateKey(new Date());
     const dayData = dataStore[colKey] || getEmptyDay();
     
-    let items = [...dayData.items];
+    let items = [...dayData.items].filter((i: any) => i.isGhost !== true);
     if (colKey !== "BUFFER" && !colKey.startsWith("BUFFER_")) {
         const activeDate = new Date(colKey + 'T00:00:00');
         const dow = activeDate.getDay();
         recurringTasks.forEach(rt => {
           if (rt.showOnWeek && rt.daysOfWeek.includes(dow)) {
-            if (rt.startDate && activeDate < new Date(rt.startDate + 'T00:00:00')) return;
-            if (rt.endDate && activeDate > new Date(rt.endDate + 'T00:00:00')) return;
+            if (rt.startDate && dateKey < rt.startDate) return;
+            if (rt.endDate && dateKey > rt.endDate) return;
             if (items.some(i => i.master_id === rt.id)) return;
             const compositeKey = `recur_${rt.id}_${colKey}`;
             items.push({
@@ -5259,8 +5260,8 @@ export default function Home() {
                           const dow = mActiveDate.getDay();
                           recurringTasks.forEach(rt => {
                             if (rt.showOnMonth && rt.daysOfWeek.includes(dow)) {
-                              if (rt.startDate && mActiveDate < new Date(rt.startDate + 'T00:00:00')) return;
-                              if (rt.endDate && mActiveDate > new Date(rt.endDate + 'T00:00:00')) return;
+                              if (rt.startDate && mKey < rt.startDate) return;
+                              if (rt.endDate && mKey > rt.endDate) return;
                               if (dayItems.some(i => i.master_id === rt.id)) return;
                               const compositeKey = `recur_${rt.id}_${mKey}`;
                               dayItems.push({
