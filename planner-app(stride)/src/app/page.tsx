@@ -183,17 +183,22 @@ const ReorderableListItem = ({ item, className, isDraggingClass, children }: { i
       dragControls={dragControls}
       className={cn(className, "relative flex items-center group gap-2")}
     >
-      <div
-        draggable={false}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          dragControls.start(e);
-        }}
-        style={{ touchAction: "none" }}
-        className="w-14 h-full min-h-[48px] cursor-grab active:cursor-grabbing text-zinc-300 hover:text-brand-navy dark:hover:text-brand-sage transition-colors shrink-0 flex items-center justify-center touch-none"
-      >
-        <GripVertical className="w-6 h-6 pointer-events-none" />
+      {!item?.is_empty && (
+        <div
+          draggable={false}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragControls.start(e);
+          }}
+          style={{ touchAction: "none" }}
+          className="w-8 h-full min-h-[40px] cursor-grab active:cursor-grabbing text-zinc-300 hover:text-brand-navy dark:hover:text-brand-sage transition-colors shrink-0 flex items-center justify-center touch-none"
+        >
+          <GripVertical className="w-5 h-5 pointer-events-none" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0 w-full">
+        {children}
       </div>
     </Reorder.Item>
   );
@@ -2071,9 +2076,10 @@ export default function Home() {
           newStore[date] = { ...day, items: day.items.map(item => item.master_id === masterId ? { ...item, is_done: true } : item) };
         }
       });
-      if (masterTask?.due_date && newStore[masterTask.due_date]) {
-        const dueDay = newStore[masterTask.due_date];
-        newStore[masterTask.due_date] = { ...dueDay, items: dueDay.items.map(item => item.master_id === masterId ? { ...item, is_done: true } : item) };
+      const masterDueDate = masterTask?.due_date || masterTask?.dueDate;
+      if (masterDueDate && newStore[masterDueDate]) {
+        const dueDay = newStore[masterDueDate];
+        newStore[masterDueDate] = { ...dueDay, items: dueDay.items.map(item => item.master_id === masterId ? { ...item, is_done: true } : item) };
       }
       return newStore;
     });
@@ -2261,29 +2267,67 @@ export default function Home() {
   const tasksArray = computedDailyItems.filter(t => !t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId));
   const getMealText = (type: MealType) => dayData.meals.find(m => m.type === type)?.text || "";
 
-  let unrankedPriorities = prioritiesArray.filter(t => t.priority_rank === undefined);
-  const priorityRenderSlots = Array.from({ length: 5 }).map((_, i) => {
-    const explicit = prioritiesArray.find(t => t.priority_rank === i);
-    if (explicit) return explicit;
-    if (unrankedPriorities.length > 0) return unrankedPriorities.shift();
+  const explicitPriorities: (TaskItem | null)[] = Array.from({ length: 5 }, () => null);
+  const remainingPriorities: TaskItem[] = [];
+
+  prioritiesArray.forEach(task => {
+    if (typeof task.priority_rank === 'number' && task.priority_rank >= 0 && task.priority_rank < 5 && !explicitPriorities[task.priority_rank]) {
+      explicitPriorities[task.priority_rank] = task;
+    } else {
+      remainingPriorities.push(task);
+    }
+  });
+
+  const priorityRenderSlots = explicitPriorities.map((slot, i) => {
+    if (slot) return slot;
+    if (remainingPriorities.length > 0) return remainingPriorities.shift()!;
     return { id: `empty-priority-slot-${i}`, is_empty: true };
   });
+  while (remainingPriorities.length > 0) {
+    priorityRenderSlots.push(remainingPriorities.shift()!);
+  }
 
-  let unrankedTodos = tasksArray.filter(t => t.todo_rank === undefined);
-  const todoRenderSlots = Array.from({ length: Math.max(9, tasksArray.length) }).map((_, i) => {
-    const explicit = tasksArray.find(t => t.todo_rank === i);
-    if (explicit) return explicit;
-    if (unrankedTodos.length > 0) return unrankedTodos.shift();
+  const todoSlotCount = Math.max(9, tasksArray.length);
+  const explicitTodos: (TaskItem | null)[] = Array.from({ length: todoSlotCount }, () => null);
+  const remainingTodos: TaskItem[] = [];
+
+  tasksArray.forEach(task => {
+    if (typeof task.todo_rank === 'number' && task.todo_rank >= 0 && task.todo_rank < todoSlotCount && !explicitTodos[task.todo_rank]) {
+      explicitTodos[task.todo_rank] = task;
+    } else {
+      remainingTodos.push(task);
+    }
+  });
+
+  const todoRenderSlots = explicitTodos.map((slot, i) => {
+    if (slot) return slot;
+    if (remainingTodos.length > 0) return remainingTodos.shift()!;
     return { id: `empty-todo-slot-${i}`, is_empty: true };
   });
+  while (remainingTodos.length > 0) {
+    todoRenderSlots.push(remainingTodos.shift()!);
+  }
 
-  let unrankedGoals = goalsArray.filter(t => t.goal_rank === undefined);
-  const goalRenderSlots = Array.from({ length: Math.max(5, goalsArray.length) }).map((_, i) => {
-    const explicit = goalsArray.find(t => t.goal_rank === i);
-    if (explicit) return explicit;
-    if (unrankedGoals.length > 0) return unrankedGoals.shift();
+  const goalSlotCount = Math.max(5, goalsArray.length);
+  const explicitGoals: (TaskItem | null)[] = Array.from({ length: goalSlotCount }, () => null);
+  const remainingGoals: TaskItem[] = [];
+
+  goalsArray.forEach(task => {
+    if (typeof task.goal_rank === 'number' && task.goal_rank >= 0 && task.goal_rank < goalSlotCount && !explicitGoals[task.goal_rank]) {
+      explicitGoals[task.goal_rank] = task;
+    } else {
+      remainingGoals.push(task);
+    }
+  });
+
+  const goalRenderSlots = explicitGoals.map((slot, i) => {
+    if (slot) return slot;
+    if (remainingGoals.length > 0) return remainingGoals.shift()!;
     return { id: `empty-goal-slot-${i}`, is_empty: true };
   });
+  while (remainingGoals.length > 0) {
+    goalRenderSlots.push(remainingGoals.shift()!);
+  }
 
   // ─── Derived goal states (tied to dateKey via dayData) ────────────────────
   const stepsGoalMet = parseInt(dayData.steps || "0") >= parseInt(dayData.step_goal || "10000");
@@ -2527,7 +2571,7 @@ export default function Home() {
     const gCompleted = items.filter(t => t.is_done && goalsTagId && t.tag_id === goalsTagId).length;
     const gTotal = items.filter(t => goalsTagId && t.tag_id === goalsTagId).length;
 
-    const ghosts = isBuffer ? [] : taskBank.filter(t => t.due_date === colKey && !items.some(i => i.master_id === t.id) && !dismissedGhosts[colKey]?.includes(t.id));
+    const ghosts = isBuffer ? [] : taskBank.filter(t => (t.due_date === colKey || t.dueDate === colKey) && !items.some(i => i.master_id === t.id) && !dismissedGhosts[colKey]?.includes(t.id));
     const isExpanded = expandedDays.includes(colKey);
 
     const top5Items = [
