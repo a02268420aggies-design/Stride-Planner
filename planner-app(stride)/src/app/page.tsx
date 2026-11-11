@@ -6,11 +6,12 @@ import { ConcentricRings } from "@/components/ConcentricRings";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
-import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical, Folder } from "lucide-react";
 
 
 
-type TagItem = { id: string; name: string; color: string; };
+type TagItem = { id: string; name: string; color: string; category_id?: string; };
+type CategoryItem = { id: string; name: string; };
 type RecurringTask = { id: string; text?: string; title?: string; name?: string; label?: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; startDate?: string; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
 type MasterTask = { id: string; text?: string; title?: string; name?: string; label?: string; is_priority: boolean; is_goal?: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
 type TaskItem = { id: string; master_id: string; text?: string; title?: string; name?: string; label?: string; is_done: boolean; is_priority: boolean; is_goal?: boolean; priority_rank?: number; todo_rank?: number; goal_rank?: number; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
@@ -106,11 +107,20 @@ const aestheticColors = [
 ];
 
 // Default Tags
+// Default Categories
+const defaultCategories: CategoryItem[] = [
+  { id: "general", name: "General" },
+  { id: "projects", name: "Projects" },
+  { id: "goals", name: "Goals" },
+  { id: "assignments", name: "Assignments" },
+  { id: "personal", name: "Personal" },
+];
+
 const defaultTags: TagItem[] = [
-  { id: "tag-goals", name: "Goals", color: "#9C9F84" },
-  { id: "tag-assignments", name: "Assignments", color: "#000080" },
-  { id: "tag-appointments", name: "Appointments", color: "#d97706" },
-  { id: "tag-projects", name: "Projects", color: "#7c3aed" },
+  { id: "tag-goals", name: "Goals", color: "#9C9F84", category_id: "goals" },
+  { id: "tag-assignments", name: "Assignments", color: "#000080", category_id: "assignments" },
+  { id: "tag-appointments", name: "Appointments", color: "#d97706", category_id: "personal" },
+  { id: "tag-projects", name: "Projects", color: "#7c3aed", category_id: "projects" },
 ];
 
 
@@ -165,6 +175,99 @@ const formatBufferLabel = (rawKey: string): string => {
   return rawKey.substring(5).replace('-', '/');
 };
 
+const CategorySelector = ({
+  categories: cats,
+  selectedCategory,
+  onSelectCategory,
+  onAddCategory,
+}: {
+  categories: CategoryItem[];
+  selectedCategory: string;
+  onSelectCategory: (id: string) => void;
+  onAddCategory: (name: string) => string;
+}) => {
+  const categories = cats;
+  const [isAdding, setIsAdding] = useState(false);
+  const [catName, setCatName] = useState("");
+
+  const handleAdd = () => {
+    if (!catName.trim()) return;
+    const newId = onAddCategory(catName.trim());
+    setCatName("");
+    setIsAdding(false);
+    onSelectCategory(newId);
+  };
+
+  return (
+    <div className="flex flex-col gap-1 w-full text-left">
+      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+        Category
+      </label>
+      {isAdding ? (
+        <div className="flex items-center gap-1.5 w-full">
+          <input
+            type="text"
+            placeholder="New Category..."
+            value={catName}
+            onChange={(e) => setCatName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAdd();
+              }
+              if (e.key === "Escape") {
+                setIsAdding(false);
+                setCatName("");
+              }
+            }}
+            className="flex-1 min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-xs outline-none focus:border-brand-navy dark:text-zinc-100"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!catName.trim()}
+            className="px-2 py-1 bg-brand-navy dark:bg-brand-sage text-white text-xs font-bold rounded disabled:opacity-50 hover:opacity-90 shrink-0"
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsAdding(false);
+              setCatName("");
+            }}
+            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <select
+          value={selectedCategory || "general"}
+          onChange={(e) => {
+            if (e.target.value === "__ADD_CATEGORY__") {
+              setIsAdding(true);
+            } else {
+              onSelectCategory(e.target.value);
+            }
+          }}
+          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-brand-navy cursor-pointer"
+        >
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+          <option value="__ADD_CATEGORY__" className="font-semibold text-brand-navy dark:text-brand-sage">
+            + Add Category
+          </option>
+        </select>
+      )}
+    </div>
+  );
+};
+
 const findTagNameByColor = (colorHex: string, tagsList: TagItem[]): string | null => {
   const match = tagsList.find(t => t.color.toLowerCase() === colorHex.toLowerCase());
   return match ? match.name : null;
@@ -204,7 +307,8 @@ const ReorderableListItem = ({ item, className, isDraggingClass, children }: { i
   );
 };
 
-const TaskBankCard = ({
+const TaskBankCard = (props: any) => {
+  const {
   task,
   schedulingState,
   nudgeApproaching,
@@ -233,7 +337,21 @@ const TaskBankCard = ({
   closeTaskBank,
   setRecurringModalTask,
   setEditingTask
-}: any) => {
+  } = props;
+  const categories = props.categories || defaultCategories;
+  const setCategories = props.setCategories;
+  const lastSelectedCategory = props.lastSelectedCategory || "general";
+  const setLastSelectedCategory = props.setLastSelectedCategory;
+  const [newTagCategory, setNewTagCategory] = useState(lastSelectedCategory || "general");
+  useEffect(() => { if (lastSelectedCategory) setNewTagCategory(lastSelectedCategory); }, [lastSelectedCategory]); /*
+
+  categories={categories}
+  setCategories={setCategories}
+  lastSelectedCategory={lastSelectedCategory}
+
+  };
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+*/
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   useEffect(() => { setIsTouchDevice(typeof window !== 'undefined' && (window.matchMedia("(hover: none)").matches || navigator.maxTouchPoints > 0)); }, []);
   const [localPriority, setLocalPriority] = useState(task.is_priority);
@@ -448,13 +566,34 @@ const TaskBankCard = ({
                    }}
                    className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", newTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+              <CategorySelector
+                categories={categories || defaultCategories}
+                selectedCategory={newTagCategory}
+                onSelectCategory={(id) => {
+                  setNewTagCategory(id);
+                  if (setLastSelectedCategory) setLastSelectedCategory(id);
+                }}
+                onAddCategory={(catName) => {
+                  const newId = `cat_${Date.now()}`;
+                  const newCat = { id: newId, name: catName };
+                  if (setCategories) setCategories((prev: any) => [...prev, newCat]);
+                  if (setLastSelectedCategory) setLastSelectedCategory(newId);
+                  return newId;
+                }}
+              />
+              <div style={{ display: 'none' }}>
+                {(true && (<span
                  />
                ))}
              </div>
              <button 
                onClick={() => {
                  if (!newTagName.trim()) return;
-                 const newTag = { id: `tag_${Date.now()}`, name: newTagName.trim(), color: newTagColor };
+                 const newTag = { id: `tag_${Date.now()}`, name: newTagName.trim(), color: newTagColor, category_id: newTagCategory || "general" };
+                 setActiveTagDropdownId(null);
                  setTags((prev: any) => [...prev, newTag]);
                  handleTagUpdate(newTag.id);
                  setNewTagName("");
@@ -527,7 +666,12 @@ const TaskBankCard = ({
     </div>
   );
 };
-const EditTaskModal = ({ task, tags, onSave, onClose }: { task: MasterTask, tags: TagItem[], onSave: (t: MasterTask) => void, onClose: () => void }) => {
+const EditTaskModal = (props: any) => {
+  const { task, tags, onSave, onClose, setTags, categories = defaultCategories, setCategories, lastSelectedCategory = "general", setLastSelectedCategory } = props;
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState(aestheticColors[0]);
+  const [newTagCategory, setNewTagCategory] = useState(lastSelectedCategory || "general");
   const [text, setText] = useState(task.title || task.text || task.name || task.label || "");
   const [dueDate, setDueDate] = useState(task.due_date || task.dueDate || "");
   const [tagId, setTagId] = useState(task.tag_id || "");
@@ -575,14 +719,107 @@ const EditTaskModal = ({ task, tags, onSave, onClose }: { task: MasterTask, tags
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tag</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tag</label>
+              {!isCreatingTag && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingTag(true);
+                    setNewTagName("");
+                    setNewTagColor(aestheticColors[0]);
+                    setNewTagCategory(lastSelectedCategory || "general");
+                  }}
+                  className="text-xs font-semibold text-brand-navy dark:text-brand-sage hover:underline"
+                >
+                  + New Tag
+                </button>
+              )}
+            </div>
+            {isCreatingTag && (
+              <div className="flex flex-col gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg animate-in fade-in duration-150 mb-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Tag name"
+                    value={newTagName}
+                    onChange={e => setNewTagName(e.target.value)}
+                    className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2.5 py-1.5 text-xs outline-none focus:border-brand-navy dark:text-zinc-100"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setIsCreatingTag(false); setNewTagName(""); }}
+                    className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                    title="Cancel"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                {/* Color picker */}
+                <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+                  {aestheticColors.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewTagColor(c)}
+                      className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", newTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                  <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 flex items-center justify-center">
+                    <Palette className="w-3 h-3 text-zinc-500 absolute pointer-events-none" />
+                    <input type="color" value={newTagColor || "#000000"} onChange={e => setNewTagColor(e.target.value)} className="w-8 h-8 absolute -top-1 -left-1 cursor-pointer opacity-0" />
+                  </div>
+                </div>
+
+                {/* Category selector right beneath the color picker */}
+                <CategorySelector
+                  categories={categories || defaultCategories}
+                  selectedCategory={newTagCategory}
+                  onSelectCategory={(id) => {
+                    setNewTagCategory(id);
+                    if (setLastSelectedCategory) setLastSelectedCategory(id);
+                  }}
+                  onAddCategory={(catName) => {
+                    const newId = `cat_${Date.now()}`;
+                    const newCat = { id: newId, name: catName };
+                    if (setCategories) setCategories((prev: any) => [...prev, newCat]);
+                    if (setLastSelectedCategory) setLastSelectedCategory(newId);
+                    return newId;
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newTagName.trim()) return;
+                    const createdTag: TagItem = {
+                      id: `tag_${Date.now()}`,
+                      name: newTagName.trim(),
+                      color: newTagColor,
+                      category_id: newTagCategory || "general"
+                    };
+                    if (setTags) setTags((prev: any) => [...prev, createdTag]);
+                    setTagId(createdTag.id);
+                    setIsCreatingTag(false);
+                    setNewTagName("");
+                  }}
+                  disabled={!newTagName.trim()}
+                  className="w-full bg-brand-navy dark:bg-brand-sage text-white font-bold text-xs py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  Create & Select Tag
+                </button>
+              </div>
+            )}
             <select 
               value={tagId} 
               onChange={e => setTagId(e.target.value)}
               className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
             >
               <option value="">No Tag</option>
-              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {tags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
 
@@ -603,12 +840,23 @@ const EditTaskModal = ({ task, tags, onSave, onClose }: { task: MasterTask, tags
           <button 
             onClick={() => {
               if (!text.trim()) return;
+              let finalTagId = tagId;
+              if (isCreatingTag && newTagName.trim()) {
+                const createdTag: TagItem = {
+                  id: `tag_${Date.now()}`,
+                  name: newTagName.trim(),
+                  color: newTagColor,
+                  category_id: newTagCategory || "general"
+                };
+                if (setTags) setTags((prev: any) => [...prev, createdTag]);
+                finalTagId = createdTag.id;
+              }
               onSave({
                 ...task,
                 text: text.trim(),
                 due_date: dueDate || undefined,
                 dueDate: dueDate || undefined,
-                tag_id: tagId || undefined,
+                tag_id: finalTagId || undefined,
                 nudgeDate: nudgeDate ? new Date(nudgeDate).toISOString() : undefined,
                 isReminderActive: !!nudgeDate,
                 reminderTime: nudgeDate ? new Date(nudgeDate).toISOString() : undefined
@@ -927,7 +1175,10 @@ export default function Home() {
     try {
       if (typeof window !== "undefined") {
         const saved = localStorage.getItem('stride-tags');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return parsed.map((t: any) => ({ ...t, category_id: t.category_id || "general" }));
+        }
       }
       return defaultTags;
     } catch { return defaultTags; }
@@ -940,6 +1191,53 @@ export default function Home() {
   useEffect(() => {
     try { localStorage.setItem('stride-monthly-milestones', JSON.stringify(monthlyMilestones)); } catch {}
   }, [monthlyMilestones]);
+
+  const [categories, setCategories] = useState<CategoryItem[]>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem('stride-categories');
+        if (saved) return JSON.parse(saved);
+      }
+      return defaultCategories;
+    } catch { return defaultCategories; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('stride-categories', JSON.stringify(categories)); } catch {}
+  }, [categories]);
+
+  const [lastSelectedCategory, setLastSelectedCategory] = useState<string>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem('stride-last-category') || "general";
+      }
+    } catch {}
+    return "general";
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('stride-last-category', lastSelectedCategory); } catch {}
+  }, [lastSelectedCategory]);
+
+  const [bankSortMode, setBankSortMode] = useState<'categories' | 'tags'>('categories');
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [collapsedTagBuckets, setCollapsedTagBuckets] = useState<string[]>([]);
+  const [newTagCategory, setNewTagCategory] = useState<string>("general");
+
+  const handleAddCategory = (name: string): string => {
+    const trimmed = name.trim();
+    if (!trimmed) return "general";
+    const existing = categories.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+    if (existing) {
+      setLastSelectedCategory(existing.id);
+      return existing.id;
+    }
+    const newId = `cat_${Date.now()}`;
+    const newCategory: CategoryItem = { id: newId, name: trimmed };
+    setCategories(prev => [...prev, newCategory]);
+    setLastSelectedCategory(newId);
+    return newId;
+  };
 
   const [animatingBufferId, setAnimatingBufferId] = useState<string | null>(null);
   const [huddleYesterdayItems, setHuddleYesterdayItems] = useState<TaskItem[]>([]);
@@ -1001,6 +1299,8 @@ export default function Home() {
     setIsBankOpen(false);
     setTimeout(() => {
       setExpandedHeaders([]);
+      setExpandedCategories([]);
+      setCollapsedTagBuckets([]);
       setBankSearchQuery("");
       setMealSearchQuery("");
       setMealFilterType("ALL");
@@ -1959,7 +2259,7 @@ export default function Home() {
 
   const handleAddTag = () => {
     if (!newTagName.trim()) return null;
-    const newTag: TagItem = { id: `tag_${Date.now()}`, name: newTagName.trim(), color: tempTagColor };
+    const newTag: TagItem = { id: `tag_${Date.now()}`, name: newTagName.trim(), color: tempTagColor, category_id: newTagCategory || "general" };
     setTags(prev => [...prev, newTag]);
     setNewTaskTagId(newTag.id);
     setIsCreatingTag(false);
@@ -1995,6 +2295,8 @@ export default function Home() {
     setNewTaskText(""); setNewTaskTagId(""); setNewTaskDate(dateKey);
     setNewTaskTime(""); setNewTaskNotes(""); setNewTaskPriority(false); setNewTaskIsGoal(false);
     setNewTaskReminderTime(""); setNewTaskReminderActive(false);
+    setNewTagName(""); setTempTagColor(aestheticColors[0]);
+    setNewTagCategory(lastSelectedCategory || "general");
     setIsCreatingTag(false); setIsPaletteOpen(false);
     setNewTaskIsRecurring(false); setNewTaskRecurringDays([]); setNewTaskRecurringEnd("");
     setNewTaskShowOnWeek(false); setNewTaskShowOnMonth(false);
@@ -2353,6 +2655,59 @@ export default function Home() {
     if (a === "untagged") return 1; if (b === "untagged") return -1;
     return (tagsById[a]?.name || "").localeCompare(tagsById[b]?.name || "");
   });
+
+  const bankByCategory = useMemo(() => {
+    const catMap: Record<string, {
+      category: CategoryItem;
+      tags: { tagId: string; tag?: TagItem; tasks: MasterTask[]; }[];
+      totalTasks: number;
+    }> = {};
+
+    categories.forEach(cat => {
+      catMap[cat.id] = { category: cat, tags: [], totalTasks: 0 };
+    });
+
+    if (!catMap["general"]) {
+      catMap["general"] = { category: { id: "general", name: "General" }, tags: [], totalTasks: 0 };
+    }
+
+    sortedTagKeys.forEach(tagId => {
+      const items = bankByTag[tagId];
+      if (!items || items.length === 0) return;
+
+      const tag = tagId !== "untagged" ? tagsById[tagId] : undefined;
+      let catId = tag?.category_id || "general";
+      if (!catMap[catId]) {
+        const found = categories.find(c => c.id === catId);
+        if (found) {
+          catMap[catId] = { category: found, tags: [], totalTasks: 0 };
+        } else {
+          catId = "general";
+        }
+      }
+
+      catMap[catId].tags.push({ tagId, tag, tasks: items });
+      catMap[catId].totalTasks += items.length;
+    });
+
+    const result: {
+      category: CategoryItem;
+      tags: { tagId: string; tag?: TagItem; tasks: MasterTask[]; }[];
+      totalTasks: number;
+    }[] = [];
+
+    categories.forEach(cat => {
+      if (catMap[cat.id] && catMap[cat.id].totalTasks > 0) {
+        result.push(catMap[cat.id]);
+      }
+    });
+
+    if (catMap["general"] && catMap["general"].totalTasks > 0 && !result.some(r => r.category.id === "general")) {
+      result.unshift(catMap["general"]);
+    }
+
+    return result;
+  }, [categories, sortedTagKeys, bankByTag, tagsById]);
 
   const tasksCompleted = tasksArray.filter((t) => t.is_done).length;
   const anyNudge = taskBank.some(t => isNudgeApproaching(t) || isNudgeOverdue(t));
@@ -2806,9 +3161,36 @@ export default function Home() {
                                  <option value="NEW" className="font-bold text-brand-navy">➕ Create new...</option>
                                </select>
                              ) : (
-                               <div className="flex items-center gap-2 w-full h-full">
+                               <div className="flex flex-col gap-2 w-full"><div className="flex items-center gap-2 w-full h-full">
                                  <input type="text" placeholder="Tag name" value={newTagName || ""} onChange={e => setNewTagName(e.target.value)} className="bg-transparent border-none text-xs focus:ring-0 w-full p-0 outline-none text-zinc-900 dark:text-zinc-100" autoFocus />
                                  <button type="button" onClick={() => { setIsCreatingTag(false); setIsPaletteOpen(false); }} className="text-zinc-400 hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+                                </div>
+                                <div className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 animate-in fade-in duration-150">
+                                  <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+                                    {aestheticColors.map(c => (
+                                      <button
+                                        key={c}
+                                        type="button"
+                                        onClick={() => setTempTagColor(c)}
+                                        className={cn("w-4 h-4 rounded-full shrink-0 border-2 transition-all", tempTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
+                                        style={{ backgroundColor: c }}
+                                      />
+                                    ))}
+                                    <div className="relative w-4 h-4 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 flex items-center justify-center">
+                                      <Palette className="w-2.5 h-2.5 text-zinc-500 absolute pointer-events-none" />
+                                      <input type="color" value={tempTagColor || "#000000"} onChange={e => setTempTagColor(e.target.value)} className="w-6 h-6 absolute -top-1 -left-1 cursor-pointer opacity-0" />
+                                    </div>
+                                  </div>
+                                  <CategorySelector
+                                    categories={categories}
+                                    selectedCategory={newTagCategory}
+                                    onSelectCategory={(id) => {
+                                      setNewTagCategory(id);
+                                      setLastSelectedCategory(id);
+                                    }}
+                                    onAddCategory={handleAddCategory}
+                                  />
+                                </div>
                                </div>
                              )}
                           </div>
@@ -2990,6 +3372,36 @@ export default function Home() {
             <button onClick={() => setBankActiveTab('meals')} className={cn("px-2 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap", bankActiveTab === 'meals' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Meals</button>
           </div>
           {bankActiveTab === 'tasks' && (
+            <div className="grid grid-cols-2 gap-1 bg-zinc-200/60 dark:bg-zinc-800/60 p-1 rounded-lg text-xs font-semibold mt-2">
+              <button
+                type="button"
+                onClick={() => setBankSortMode('categories')}
+                className={cn(
+                  "py-1.5 px-3 rounded-md text-xs font-bold transition-all text-center",
+                  bankSortMode === 'categories'
+                    ? "bg-white dark:bg-zinc-900 text-brand-navy dark:text-brand-sage shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                )}
+              >
+                Sort by Categories
+              </button>
+              <button
+                type="button"
+                onClick={() => setBankSortMode('tags')}
+                className={cn(
+                  "py-1.5 px-3 rounded-md text-xs font-bold transition-all text-center",
+                  bankSortMode === 'tags'
+                    ? "bg-white dark:bg-zinc-900 text-brand-navy dark:text-brand-sage shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                )}
+              >
+                Sort by Tags
+              </button>
+            </div>
+          )}
+          <div className="hidden">
+          </div>
+          {bankActiveTab === 'tasks' && (
             <div className="flex gap-2 items-center mt-3">
               <div className="flex-1 relative">
                 <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -2998,7 +3410,7 @@ export default function Home() {
               <select value={bankFilterTagId || ""} onChange={e => setBankFilterTagId(e.target.value)} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-navy/50 transition-colors text-sm text-zinc-700 dark:text-zinc-300 min-w-[100px] outline-none">
                 <option value="ALL">All Tags</option>
                 <option value="untagged">Untagged</option>
-                {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {tags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
           )}
@@ -3111,6 +3523,10 @@ export default function Home() {
                             setViewMode={setViewMode}
                             closeTaskBank={closeTaskBank}
                             setEditingTask={setEditingTask}
+  categories={categories}
+  setCategories={setCategories}
+  lastSelectedCategory={lastSelectedCategory}
+  setLastSelectedCategory={setLastSelectedCategory}
                           />
                         );
                       })}
@@ -3171,6 +3587,10 @@ export default function Home() {
                                 setViewMode={setViewMode}
                                 closeTaskBank={closeTaskBank}
                                 setEditingTask={setEditingTask}
+  categories={categories}
+  setCategories={setCategories}
+  lastSelectedCategory={lastSelectedCategory}
+  setLastSelectedCategory={setLastSelectedCategory}
                               />
                             );
                         })}
@@ -3218,6 +3638,10 @@ export default function Home() {
                                    setViewMode={setViewMode}
                                    closeTaskBank={closeTaskBank}
                                    setEditingTask={setEditingTask}
+  categories={categories}
+  setCategories={setCategories}
+  lastSelectedCategory={lastSelectedCategory}
+  setLastSelectedCategory={setLastSelectedCategory}
                                  />
                                );
                            })}
@@ -3265,6 +3689,10 @@ export default function Home() {
                                    setViewMode={setViewMode}
                                    closeTaskBank={closeTaskBank}
                                    setEditingTask={setEditingTask}
+  categories={categories}
+  setCategories={setCategories}
+  lastSelectedCategory={lastSelectedCategory}
+  setLastSelectedCategory={setLastSelectedCategory}
                                  />
                                );
                            })}
@@ -4097,6 +4525,11 @@ export default function Home() {
       {editingTask && (
         <EditTaskModal 
           task={editingTask} 
+          setTags={setTags}
+          categories={categories}
+          setCategories={setCategories}
+          lastSelectedCategory={lastSelectedCategory}
+          setLastSelectedCategory={setLastSelectedCategory} 
           tags={tags} 
           onSave={handleSaveEditedTask} 
           onClose={() => setEditingTask(null)} 
@@ -4154,15 +4587,46 @@ export default function Home() {
                       </div>
                     )}
                     {!isCreatingTag ? (
-                      <select value={newTaskTagId || ""} onChange={e => { if (e.target.value === "NEW") { setIsCreatingTag(true); setTempTagColor(aestheticColors[0]); } else { setNewTaskTagId(e.target.value); setIsPaletteOpen(false); } }} className="bg-transparent border-none text-sm focus:ring-0 w-full text-zinc-800 dark:text-zinc-200 cursor-pointer appearance-none p-0 outline-none">
+                      <select value={newTaskTagId || ""} onChange={e => { if (e.target.value === "NEW") { setIsCreatingTag(true); setTempTagColor(aestheticColors[0]); setNewTagCategory(lastSelectedCategory || "general"); } else { setNewTaskTagId(e.target.value); setIsPaletteOpen(false); } }} className="bg-transparent border-none text-sm focus:ring-0 w-full text-zinc-800 dark:text-zinc-200 cursor-pointer appearance-none p-0 outline-none">
                         <option value="">No Tag</option>
-                        {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {tags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                         <option value="NEW" className="font-bold text-brand-navy">➕ Create new tag...</option>
                       </select>
                     ) : (
-                      <div className="flex items-center gap-2 w-full h-full">
+                      <div className="flex flex-col gap-2 w-full"><div className="flex items-center gap-2 w-full h-full">
                         <input type="text" placeholder="Tag name" value={newTagName || ""} onChange={e => setNewTagName(e.target.value)} className="bg-transparent border-none text-sm focus:ring-0 w-full p-0 h-auto outline-none text-zinc-900 dark:text-zinc-100" autoFocus />
                         <button type="button" onClick={() => { setIsCreatingTag(false); setIsPaletteOpen(false); }} className="text-zinc-400 hover:text-red-500 transition-colors"><X className="w-4 h-4" /></button>
+                      </div>
+                      <div className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 animate-in fade-in duration-150">
+                        {/* Color Picker Swatches */}
+                        <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+                          {aestheticColors.map(c => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setTempTagColor(c)}
+                              className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", tempTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                          <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 flex items-center justify-center">
+                            <Palette className="w-3 h-3 text-zinc-500 absolute pointer-events-none" />
+                            <input type="color" value={tempTagColor || "#000000"} onChange={e => setTempTagColor(e.target.value)} className="w-8 h-8 absolute -top-1 -left-1 cursor-pointer opacity-0" />
+                          </div>
+                        </div>
+
+                        {/* Category selector right beneath the color picker */}
+                        <CategorySelector
+                          categories={categories}
+                          selectedCategory={newTagCategory}
+                          onSelectCategory={(id) => {
+                            setNewTagCategory(id);
+                            setLastSelectedCategory(id);
+                          }}
+                          onAddCategory={handleAddCategory}
+                        />
+                      </div>
+
                       </div>
                     )}
                   </div>
