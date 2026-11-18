@@ -6,7 +6,7 @@ import { ConcentricRings } from "@/components/ConcentricRings";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
-import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical, Folder } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical, Folder, Settings2, SlidersHorizontal } from "lucide-react";
 
 
 
@@ -186,23 +186,38 @@ const CategorySelector = ({
   onSelectCategory: (id: string) => void;
   onAddCategory: (name: string) => string;
 }) => {
-  const categories = cats;
+  const categories = cats && cats.length > 0 ? cats : defaultCategories;
   const [isAdding, setIsAdding] = useState(false);
   const [catName, setCatName] = useState("");
 
   const handleAdd = () => {
-    if (!catName.trim()) return;
-    const newId = onAddCategory(catName.trim());
+    const trimmed = catName.trim();
+    if (!trimmed) return;
+    const newId = onAddCategory(trimmed);
     setCatName("");
     setIsAdding(false);
-    onSelectCategory(newId);
+    if (newId) {
+      onSelectCategory(newId);
+    }
   };
 
   return (
     <div className="flex flex-col gap-1 w-full text-left">
-      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-        Category
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+          Category
+        </label>
+        {!isAdding && (
+          <button
+            type="button"
+            onClick={() => setIsAdding(true)}
+            className="text-[10px] font-semibold text-brand-navy dark:text-brand-sage hover:underline flex items-center gap-0.5"
+          >
+            <Plus className="w-2.5 h-2.5" />
+            <span>+ New Category</span>
+          </button>
+        )}
+      </div>
       {isAdding ? (
         <div className="flex items-center gap-1.5 w-full">
           <input
@@ -260,10 +275,280 @@ const CategorySelector = ({
             </option>
           ))}
           <option value="__ADD_CATEGORY__" className="font-semibold text-brand-navy dark:text-brand-sage">
-            + Add Category
+            + New Category
           </option>
         </select>
       )}
+    </div>
+  );
+};
+
+const ManageCategoriesModal = ({
+  isOpen,
+  onClose,
+  categories,
+  onAddCategory,
+  onDeleteCategory,
+  tags,
+  onReassignTagCategory,
+  onDeleteTag,
+  taskBank,
+  dataStore,
+  recurringTasks,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  categories: CategoryItem[];
+  onAddCategory: (name: string) => string;
+  onDeleteCategory: (catId: string) => void;
+  tags: TagItem[];
+  onReassignTagCategory: (tagId: string, newCategoryId: string) => void;
+  onDeleteTag: (tagId: string) => void;
+  taskBank: MasterTask[];
+  dataStore: TaskData;
+  recurringTasks: RecurringTask[];
+}) => {
+  const [newCatName, setNewCatName] = useState("");
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleAddSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    onAddCategory(trimmed);
+    setNewCatName("");
+  };
+
+  const getTagTaskCount = (tagId: string): number => {
+    let count = 0;
+    for (const t of taskBank) {
+      if (t.tag_id === tagId) count++;
+    }
+    for (const day of Object.values(dataStore)) {
+      if (day && Array.isArray(day.items)) {
+        for (const t of day.items) {
+          if (t.tag_id === tagId) count++;
+        }
+      }
+    }
+    for (const rt of (recurringTasks || [])) {
+      if (rt.tag_id === tagId) count++;
+    }
+    return count;
+  };
+
+  const getCategoryTagCount = (catId: string): number => {
+    return tags.filter((t) => (t.category_id || "general") === catId).length;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm transition-opacity"
+      />
+      <div
+        className="relative bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-brand-navy/10 dark:bg-brand-sage/10 text-brand-navy dark:text-brand-sage flex items-center justify-center">
+              <SlidersHorizontal className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                Manage Categories & Tags
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Create categories, organize tags, and safely delete unused items
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 custom-scrollbar">
+          {/* Section 1: Categories Section */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 flex items-center gap-1.5">
+                <Folder className="w-3.5 h-3.5 text-brand-navy dark:text-brand-sage" />
+                <span>Categories</span>
+                <span className="text-[11px] font-semibold text-zinc-400 ml-1">
+                  ({categories.length})
+                </span>
+              </h3>
+            </div>
+
+            {/* Add Category Form */}
+            <form onSubmit={handleAddSubmit} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="New category name (e.g. Work, Health, Personal)..."
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-brand-navy dark:focus:border-brand-sage transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!newCatName.trim()}
+                className="px-3 py-1.5 bg-brand-navy dark:bg-brand-sage text-white text-xs font-bold rounded-lg disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center gap-1 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add</span>
+              </button>
+            </form>
+
+            {/* Categories List */}
+            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto custom-scrollbar border border-zinc-100 dark:border-zinc-800/80 rounded-xl p-1 bg-zinc-50/50 dark:bg-zinc-900/30">
+              {categories.map((cat) => {
+                const isGeneral = cat.id === "general" || cat.name.toLowerCase() === "general";
+                const assignedTagCount = getCategoryTagCount(cat.id);
+
+                return (
+                  <div
+                    key={cat.id}
+                    className="flex items-center justify-between px-3 py-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200/70 dark:border-zinc-800 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                        {cat.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                        {assignedTagCount} {assignedTagCount === 1 ? "tag" : "tags"}
+                      </span>
+                      {isGeneral ? (
+                        <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                          Default
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteCategory(cat.id)}
+                          className="p-1 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors"
+                          title={
+                            assignedTagCount > 0
+                              ? `Delete category (reassigns ${assignedTagCount} tag(s) to General)`
+                              : "Delete unused category"
+                          }
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section 2: Organize Tags Section */}
+          <div className="flex flex-col gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-brand-navy dark:text-brand-sage" />
+                <span>Organize Tags</span>
+                <span className="text-[11px] font-semibold text-zinc-400 ml-1">
+                  ({tags.length})
+                </span>
+              </h3>
+            </div>
+
+            {tags.length === 0 ? (
+              <div className="text-center py-6 text-zinc-400 text-xs italic">
+                No tags created yet.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto custom-scrollbar border border-zinc-100 dark:border-zinc-800/80 rounded-xl p-1 bg-zinc-50/50 dark:bg-zinc-900/30">
+                {tags.map((tag) => {
+                  const taskCount = getTagTaskCount(tag.id);
+                  return (
+                    <div
+                      key={tag.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200/70 dark:border-zinc-800 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                          {tag.name}
+                        </span>
+                        <span className="text-[11px] text-zinc-400 shrink-0 font-medium bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                          {taskCount} {taskCount === 1 ? "task" : "tasks"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Category selector */}
+                        <select
+                          value={tag.category_id || "general"}
+                          onChange={(e) => onReassignTagCategory(tag.id, e.target.value)}
+                          className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-xs text-zinc-700 dark:text-zinc-300 outline-none focus:border-brand-navy cursor-pointer"
+                        >
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Delete Tag button */}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteTag(tag.id)}
+                          className="p-1 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors"
+                          title={
+                            taskCount > 0
+                              ? `Delete tag (will untag ${taskCount} task(s) safely)`
+                              : "Delete unused tag"
+                          }
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex justify-end shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs rounded-lg transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1196,7 +1481,15 @@ export default function Home() {
     try {
       if (typeof window !== "undefined") {
         const saved = localStorage.getItem('stride-categories');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (!parsed.some((c: any) => c.id === "general")) {
+              return [{ id: "general", name: "General" }, ...parsed];
+            }
+            return parsed;
+          }
+        }
       }
       return defaultCategories;
     } catch { return defaultCategories; }
@@ -1253,6 +1546,7 @@ export default function Home() {
   const [showInsights, setShowInsights] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [isShoppingMode, setIsShoppingMode] = useState(false);
+  const [isManageCategoriesModalOpen, setIsManageCategoriesModalOpen] = useState(false);
 
   const [mealBank, setMealBank] = useState<MealItem[]>(() => {
     try {
@@ -1448,6 +1742,52 @@ export default function Home() {
   useEffect(() => {
     try { localStorage.setItem('stride_recurringTasks', JSON.stringify(recurringTasks)); } catch {}
   }, [recurringTasks]);
+
+  const handleDeleteCategory = (catId: string) => {
+    if (catId === "general") return;
+    setTags(prev => prev.map(t => (t.category_id || "general") === catId ? { ...t, category_id: "general" } : t));
+    setCategories(prev => prev.filter(c => c.id !== catId));
+    if (lastSelectedCategory === catId) setLastSelectedCategory("general");
+    if (newTagCategory === catId) setNewTagCategory("general");
+  };
+
+  const handleDeleteTag = (tagId: string) => {
+    // 1. Remove from tags
+    setTags(prev => prev.filter(t => t.id !== tagId));
+
+    // 2. Strip tag_id from taskBank
+    setTaskBank(prev => prev.map(t => (t.tag_id === tagId ? { ...t, tag_id: undefined } : t)));
+
+    // 3. Strip tag_id from dataStore
+    setDataStore(prev => {
+      const next = { ...prev };
+      for (const dateKey of Object.keys(next)) {
+        const day = next[dateKey];
+        if (day && Array.isArray(day.items)) {
+          let modified = false;
+          const nextItems = day.items.map(item => {
+            if (item.tag_id === tagId) {
+              modified = true;
+              return { ...item, tag_id: undefined };
+            }
+            return item;
+          });
+          if (modified) {
+            next[dateKey] = { ...day, items: nextItems };
+          }
+        }
+      }
+      return next;
+    });
+
+    // 4. Strip tag_id from recurringTasks
+    setRecurringTasks(prev => prev.map(rt => (rt.tag_id === tagId ? { ...rt, tag_id: undefined } : rt)));
+
+    // 5. Reset bankFilterTagId if it was the deleted tag
+    if (bankFilterTagId === tagId) {
+      setBankFilterTagId("ALL");
+    }
+  };
 
   useEffect(() => {
     try { localStorage.setItem('stride_completedRoutines', JSON.stringify(completedRoutines)); } catch {}
@@ -3372,7 +3712,8 @@ export default function Home() {
             <button onClick={() => setBankActiveTab('meals')} className={cn("px-2 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap", bankActiveTab === 'meals' ? "border-brand-navy text-brand-navy dark:border-brand-sage dark:text-brand-sage" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300")}>Meals</button>
           </div>
           {bankActiveTab === 'tasks' && (
-            <div className="grid grid-cols-2 gap-1 bg-zinc-200/60 dark:bg-zinc-800/60 p-1 rounded-lg text-xs font-semibold mt-2">
+            <div className="flex items-center gap-1.5 mt-2">
+              <div className="grid grid-cols-2 gap-1 bg-zinc-200/60 dark:bg-zinc-800/60 p-1 rounded-lg text-xs font-semibold flex-1">
               <button
                 type="button"
                 onClick={() => setBankSortMode('categories')}
@@ -3398,6 +3739,15 @@ export default function Home() {
                 Sort by Tags
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsManageCategoriesModalOpen(true)}
+              title="Manage Categories & Tags"
+              className="p-2 rounded-lg bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:text-brand-navy dark:hover:text-brand-sage hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shrink-0"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
+          </div>
           )}
           <div className="hidden">
           </div>
@@ -4647,6 +4997,23 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Manage Categories & Tags Modal */}
+      <ManageCategoriesModal
+        isOpen={isManageCategoriesModalOpen}
+        onClose={() => setIsManageCategoriesModalOpen(false)}
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onDeleteCategory={handleDeleteCategory}
+        tags={tags}
+        onReassignTagCategory={(tagId, catId) => {
+          setTags(prev => prev.map(t => t.id === tagId ? { ...t, category_id: catId } : t));
+        }}
+        onDeleteTag={handleDeleteTag}
+        taskBank={taskBank}
+        dataStore={dataStore}
+        recurringTasks={recurringTasks}
+      />
 
       {/* Edit Task Modal */}
       {editingTask && (
