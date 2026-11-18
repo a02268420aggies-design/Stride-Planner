@@ -3449,8 +3449,135 @@ export default function Home() {
             </div>
           )}
           {bankActiveTab === 'tasks' && (
-            sortedTagKeys.length === 0 ? (
+            (bankSortMode === 'categories' ? bankByCategory.length === 0 : sortedTagKeys.length === 0) ? (
             <div className="text-center text-zinc-500 mt-10 text-sm">No tasks in the bank.</div>
+          ) : bankSortMode === 'categories' ? (
+            bankByCategory.map(catGroup => {
+              const isCatExpanded = expandedCategories.includes(catGroup.category.id) || bankSearchQuery.trim().length > 0;
+              const catHasNudge = catGroup.tags.some(tg => tg.tasks.some(t => isNudgeApproaching(t) || isNudgeOverdue(t)));
+
+              return (
+                <div key={catGroup.category.id} className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCategories(prev =>
+                      isCatExpanded ? prev.filter(id => id !== catGroup.category.id) : [...prev, catGroup.category.id]
+                    )}
+                    className={cn(
+                      "flex items-center gap-2.5 border-b pb-2 sticky top-0 z-10 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-sm transition-colors text-left group",
+                      isCatExpanded ? "border-brand-navy/30 dark:border-brand-sage/30" : "border-zinc-200 dark:border-zinc-800"
+                    )}
+                  >
+                    <div className="w-6 h-6 rounded-md bg-brand-navy/10 dark:bg-brand-sage/10 text-brand-navy dark:text-brand-sage flex items-center justify-center shrink-0">
+                      <Folder className="w-3.5 h-3.5" />
+                    </div>
+                    <h3 className={cn(
+                      "text-sm font-bold uppercase tracking-wider transition-colors",
+                      isCatExpanded ? "text-brand-navy dark:text-brand-sage" : "text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-100"
+                    )}>
+                      {catGroup.category.name}
+                    </h3>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-xs font-semibold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md relative">
+                        {catGroup.totalTasks}
+                        {!isCatExpanded && catHasNudge && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse-opacity border border-white dark:border-zinc-950" />
+                        )}
+                      </span>
+                      <ChevronDown className={cn("w-4 h-4 text-zinc-400 transition-transform duration-300 shrink-0", isCatExpanded && "rotate-180")} />
+                    </div>
+                  </button>
+
+                  {isCatExpanded && (
+                    <div className="flex flex-col gap-5 pl-2 border-l-2 border-zinc-100 dark:border-zinc-800/60 ml-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      {catGroup.tags.map(({ tagId, tag, tasks: tagTasks }) => {
+                        const isBucketCollapsed = collapsedTagBuckets.includes(`${catGroup.category.id}_${tagId}`);
+                        const tagHasNudge = tagTasks.some(t => isNudgeApproaching(t) || isNudgeOverdue(t));
+                        return (
+                          <div key={tagId} className="flex flex-col gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setCollapsedTagBuckets(prev =>
+                                isBucketCollapsed
+                                  ? prev.filter(k => k !== `${catGroup.category.id}_${tagId}`)
+                                  : [...prev, `${catGroup.category.id}_${tagId}`]
+                              )}
+                              className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
+                            >
+                              {tag ? (
+                                <>
+                                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">{tag.name}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-zinc-400" />
+                                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Untagged</span>
+                                </>
+                              )}
+                              <span className="text-[11px] font-semibold text-zinc-400 ml-auto flex items-center gap-1.5">
+                                <span>{tagTasks.length}</span>
+                                {isBucketCollapsed && tagHasNudge && (
+                                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse-opacity" />
+                                )}
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-zinc-400 transition-transform duration-200", !isBucketCollapsed && "rotate-180")} />
+                              </span>
+                            </button>
+
+                            {!isBucketCollapsed && (
+                              <div className="flex flex-col gap-3">
+                                {tagTasks.map(task => {
+                                  const nudgeApproaching = isNudgeApproaching(task);
+                                  const nudgeOverdue = isNudgeOverdue(task);
+                                  const hasNudge = nudgeApproaching || nudgeOverdue;
+                                  return (
+                                    <TaskBankCard
+                                      key={task.id}
+                                      task={task}
+                                      schedulingState={schedulingStates[task.id]}
+                                      nudgeApproaching={nudgeApproaching}
+                                      nudgeOverdue={nudgeOverdue}
+                                      hasNudge={hasNudge}
+                                      viewMode={viewMode}
+                                      selectedWeekDate={selectedWeekDate}
+                                      dateKey={dateKey}
+                                      isPeekOpen={isPeekOpen}
+                                      peekDate={peekDate}
+                                      isMonthlyBufferExpanded={isMonthlyBufferExpanded}
+                                      currentMonthKey={currentMonthKey}
+                                      handleScheduleTask={handleScheduleTask}
+                                      activeNudgeDropdownId={activeNudgeDropdownId}
+                                      setActiveNudgeDropdownId={setActiveNudgeDropdownId}
+                                      activeTagDropdownId={activeTagDropdownId}
+                                      setActiveTagDropdownId={setActiveTagDropdownId}
+                                      tags={tags}
+                                      setTags={setTags}
+                                      currentDate={currentDate}
+                                      setDataStore={setDataStore}
+                                      setTaskBank={setTaskBank}
+                                      setRecurringModalTask={setRecurringModalTask}
+                                      archiveMasterTask={archiveMasterTask}
+                                      setCurrentDate={setCurrentDate}
+                                      setViewMode={setViewMode}
+                                      closeTaskBank={closeTaskBank}
+                                      setEditingTask={setEditingTask}
+                                      categories={categories}
+                                      setCategories={setCategories}
+                                      lastSelectedCategory={lastSelectedCategory}
+                                      setLastSelectedCategory={setLastSelectedCategory}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
             sortedTagKeys.map(tagId => {
               const tag = tagsById[tagId];
