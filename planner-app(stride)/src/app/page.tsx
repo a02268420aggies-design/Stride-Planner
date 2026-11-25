@@ -180,11 +180,13 @@ const CategorySelector = ({
   selectedCategory,
   onSelectCategory,
   onAddCategory,
+  size = "sm",
 }: {
   categories: CategoryItem[];
   selectedCategory: string;
   onSelectCategory: (id: string) => void;
   onAddCategory: (name: string) => string;
+  size?: "xs" | "sm";
 }) => {
   const categories = cats && cats.length > 0 ? cats : defaultCategories;
   const [isAdding, setIsAdding] = useState(false);
@@ -204,16 +206,16 @@ const CategorySelector = ({
   return (
     <div className="flex flex-col gap-1 w-full text-left">
       <div className="flex items-center justify-between">
-        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+        <label className={cn("font-bold text-zinc-500 uppercase tracking-wider", size === "sm" ? "text-xs" : "text-[10px]")}>
           Category
         </label>
         {!isAdding && (
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            className="text-[10px] font-semibold text-brand-navy dark:text-brand-sage hover:underline flex items-center gap-0.5"
+            className={cn("font-semibold text-brand-navy dark:text-brand-sage hover:underline flex items-center", size === "sm" ? "text-xs gap-1" : "text-[10px] gap-0.5")}
           >
-            <Plus className="w-2.5 h-2.5" />
+            <Plus className={size === "sm" ? "w-3 h-3" : "w-2.5 h-2.5"} />
             <span>+ New Category</span>
           </button>
         )}
@@ -235,14 +237,20 @@ const CategorySelector = ({
                 setCatName("");
               }
             }}
-            className="flex-1 min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-xs outline-none focus:border-brand-navy dark:text-zinc-100"
+            className={cn(
+              "flex-1 min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-brand-navy dark:text-zinc-100",
+              size === "sm" ? "px-3 py-2 text-sm" : "px-2 py-1 text-xs"
+            )}
             autoFocus
           />
           <button
             type="button"
             onClick={handleAdd}
             disabled={!catName.trim()}
-            className="px-2 py-1 bg-brand-navy dark:bg-brand-sage text-white text-xs font-bold rounded disabled:opacity-50 hover:opacity-90 shrink-0"
+            className={cn(
+              "bg-brand-navy dark:bg-brand-sage text-white font-bold rounded-lg disabled:opacity-50 hover:opacity-90 shrink-0",
+              size === "sm" ? "px-3 py-2 text-sm" : "px-2 py-1 text-xs"
+            )}
           >
             Add
           </button>
@@ -254,7 +262,7 @@ const CategorySelector = ({
             }}
             className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 shrink-0"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className={size === "sm" ? "w-4 h-4" : "w-3.5 h-3.5"} />
           </button>
         </div>
       ) : (
@@ -267,7 +275,10 @@ const CategorySelector = ({
               onSelectCategory(e.target.value);
             }
           }}
-          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-brand-navy cursor-pointer"
+          className={cn(
+            "w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-800 dark:text-zinc-200 outline-none focus:border-brand-navy cursor-pointer transition-colors",
+            size === "sm" ? "px-3 py-2 text-sm" : "px-2 py-1.5 text-xs"
+          )}
         >
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -993,43 +1004,37 @@ const EditTaskModal = (props: any) => {
             />
           </div>
           
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Due Date</label>
-            <input 
-              type="date" 
-              value={dueDate} 
-              onChange={e => setDueDate(e.target.value)} 
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tag</label>
-              {!isCreatingTag && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreatingTag(true);
-                    setNewTagName("");
-                    setNewTagColor(aestheticColors[0]);
-                    setNewTagCategory(lastSelectedCategory || "general");
-                  }}
-                  className="text-xs font-semibold text-brand-navy dark:text-brand-sage hover:underline"
-                >
-                  + New Tag
-                </button>
-              )}
-            </div>
-            {isCreatingTag && (
-              <div className="flex flex-col gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg animate-in fade-in duration-150 mb-1">
-                <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-4">
+            {isCreatingTag ? (
+              <div className="col-span-2 p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-800/40 flex flex-col gap-3 animate-in fade-in duration-150">
+                {/* Row 1: Selected color indicator dot + Tag name text input + subtle X button */}
+                <div className="flex items-center gap-2 w-full">
+                  <span
+                    className="w-4 h-4 rounded-full shrink-0 shadow-sm border border-black/10 transition-colors"
+                    style={{ backgroundColor: newTagColor }}
+                  />
                   <input
                     type="text"
                     placeholder="Tag name"
                     value={newTagName}
                     onChange={e => setNewTagName(e.target.value)}
-                    className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2.5 py-1.5 text-xs outline-none focus:border-brand-navy dark:text-zinc-100"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (!newTagName.trim()) return;
+                        const createdTag: TagItem = {
+                          id: `tag_${Date.now()}`,
+                          name: newTagName.trim(),
+                          color: newTagColor,
+                          category_id: newTagCategory || "general"
+                        };
+                        if (setTags) setTags((prev: any) => [...prev, createdTag]);
+                        setTagId(createdTag.id);
+                        setIsCreatingTag(false);
+                        setNewTagName("");
+                      }
+                    }}
+                    className="flex-1 bg-transparent border-none text-sm focus:ring-0 p-0 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-medium"
                     autoFocus
                   />
                   <button
@@ -1041,25 +1046,34 @@ const EditTaskModal = (props: any) => {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                
-                {/* Color picker */}
-                <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+
+                {/* Row 2: Wrapped row of color swatches */}
+                <div className="flex flex-wrap items-center gap-2">
                   {aestheticColors.map(c => (
                     <button
                       key={c}
                       type="button"
                       onClick={() => setNewTagColor(c)}
-                      className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", newTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
+                      className={cn(
+                        "w-5 h-5 rounded-full shrink-0 border-2 transition-all",
+                        newTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110 shadow-sm" : "border-transparent hover:scale-110"
+                      )}
                       style={{ backgroundColor: c }}
                     />
                   ))}
-                  <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 flex items-center justify-center">
+                  <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center hover:scale-110 transition-transform">
                     <Palette className="w-3 h-3 text-zinc-500 absolute pointer-events-none" />
-                    <input type="color" value={newTagColor || "#000000"} onChange={e => setNewTagColor(e.target.value)} className="w-8 h-8 absolute -top-1 -left-1 cursor-pointer opacity-0" />
+                    <input
+                      type="color"
+                      value={newTagColor || "#000000"}
+                      onChange={e => setNewTagColor(e.target.value)}
+                      className="w-8 h-8 absolute -top-1 -left-1 cursor-pointer opacity-0"
+                      title="Custom color"
+                    />
                   </div>
                 </div>
 
-                {/* Category selector right beneath the color picker */}
+                {/* Row 3: Full-width CATEGORY label + clean dropdown select */}
                 <CategorySelector
                   categories={categories || defaultCategories}
                   selectedCategory={newTagCategory}
@@ -1074,38 +1088,46 @@ const EditTaskModal = (props: any) => {
                     if (setLastSelectedCategory) setLastSelectedCategory(newId);
                     return newId;
                   }}
+                  size="sm"
                 />
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!newTagName.trim()) return;
-                    const createdTag: TagItem = {
-                      id: `tag_${Date.now()}`,
-                      name: newTagName.trim(),
-                      color: newTagColor,
-                      category_id: newTagCategory || "general"
-                    };
-                    if (setTags) setTags((prev: any) => [...prev, createdTag]);
-                    setTagId(createdTag.id);
-                    setIsCreatingTag(false);
-                    setNewTagName("");
-                  }}
-                  disabled={!newTagName.trim()}
-                  className="w-full bg-brand-navy dark:bg-brand-sage text-white font-bold text-xs py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+              </div>
+            ) : (
+              <div className="col-span-1 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tag</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingTag(true);
+                      setNewTagName("");
+                      setNewTagColor(aestheticColors[0]);
+                      setNewTagCategory(lastSelectedCategory || "general");
+                    }}
+                    className="text-xs font-semibold text-brand-navy dark:text-brand-sage hover:underline"
+                  >
+                    + New Tag
+                  </button>
+                </div>
+                <select 
+                  value={tagId} 
+                  onChange={e => setTagId(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
                 >
-                  Create & Select Tag
-                </button>
+                  <option value="">No Tag</option>
+                  {tags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
               </div>
             )}
-            <select 
-              value={tagId} 
-              onChange={e => setTagId(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
-            >
-              <option value="">No Tag</option>
-              {tags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+
+            <div className={cn("flex flex-col gap-1.5", isCreatingTag ? "col-span-2" : "col-span-1")}>
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Due Date</label>
+              <input 
+                type="date" 
+                value={dueDate} 
+                onChange={e => setDueDate(e.target.value)} 
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-sage/50 outline-none transition-all"
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -3506,7 +3528,7 @@ export default function Home() {
                                  <button type="button" onClick={() => { setIsCreatingTag(false); setIsPaletteOpen(false); }} className="text-zinc-400 hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
                                 </div>
                                 <div className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 animate-in fade-in duration-150">
-                                  <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+                                  <div className="flex flex-wrap items-center gap-2 pb-1">
                                     {aestheticColors.map(c => (
                                       <button
                                         key={c}
@@ -5064,11 +5086,16 @@ export default function Home() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 col-span-2 sm:col-span-1 focus-within:ring-2 ring-brand-navy/20 relative">
-                  <div className="flex items-center gap-2 h-full relative">
-                    {(newTaskTagId || isCreatingTag) ? (
+                <div className={cn(
+                  "relative",
+                  isCreatingTag
+                    ? "col-span-2 p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-800/40 flex flex-col gap-3 animate-in fade-in duration-150"
+                    : "col-span-1 flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 focus-within:ring-2 ring-brand-navy/20"
+                )}>
+                  <div className={cn("relative w-full", isCreatingTag ? "flex flex-col gap-3" : "flex items-center gap-2 h-full")}>
+                    {!isCreatingTag && (newTaskTagId ? (
                       <button type="button" onClick={(e) => { e.stopPropagation(); setIsPaletteOpen(!isPaletteOpen); }} className="w-4 h-4 rounded-full shrink-0 shadow-sm border border-black/10 transition-transform hover:scale-110" style={{ backgroundColor: tempTagColor }} title="Change tag color" />
-                    ) : (<Tag className="w-4 h-4 text-zinc-400 shrink-0" />)}
+                    ) : (<Tag className="w-4 h-4 text-zinc-400 shrink-0" />))}
                     {isPaletteOpen && (
                       <div ref={paletteRef} className="absolute top-full left-0 mt-2 p-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl z-[250] flex flex-wrap gap-2 w-[90vw] max-w-[320px] mx-auto sm:w-max sm:left-auto sm:right-0 animate-in fade-in zoom-in-95 duration-100">
                         {aestheticColors.map(color => (
@@ -5087,45 +5114,72 @@ export default function Home() {
                         <option value="NEW" className="font-bold text-brand-navy">➕ Create new tag...</option>
                       </select>
                     ) : (
-                      <div className="flex flex-col gap-2 w-full"><div className="flex items-center gap-2 w-full h-full">
-                        <input type="text" placeholder="Tag name" value={newTagName || ""} onChange={e => setNewTagName(e.target.value)} className="bg-transparent border-none text-sm focus:ring-0 w-full p-0 h-auto outline-none text-zinc-900 dark:text-zinc-100" autoFocus />
+                      <div className="flex flex-col gap-3 w-full">
+                        <div className="flex items-center gap-2 w-full">
+                        <span
+                          className="w-4 h-4 rounded-full shrink-0 shadow-sm border border-black/10 transition-colors"
+                          style={{ backgroundColor: tempTagColor }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tag name"
+                          value={newTagName || ""}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                          className="flex-1 bg-transparent border-none text-sm focus:ring-0 p-0 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-medium"
+                          autoFocus
+                        />
                         <button type="button" onClick={() => { setIsCreatingTag(false); setIsPaletteOpen(false); }} className="text-zinc-400 hover:text-red-500 transition-colors"><X className="w-4 h-4" /></button>
                       </div>
-                      <div className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 animate-in fade-in duration-150">
-                        {/* Color Picker Swatches */}
-                        <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
-                          {aestheticColors.map(c => (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => setTempTagColor(c)}
-                              className={cn("w-5 h-5 rounded-full shrink-0 border-2 transition-all", tempTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110" : "border-transparent hover:scale-110")}
-                              style={{ backgroundColor: c }}
-                            />
-                          ))}
-                          <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 flex items-center justify-center">
-                            <Palette className="w-3 h-3 text-zinc-500 absolute pointer-events-none" />
-                            <input type="color" value={tempTagColor || "#000000"} onChange={e => setTempTagColor(e.target.value)} className="w-8 h-8 absolute -top-1 -left-1 cursor-pointer opacity-0" />
-                          </div>
-                        </div>
 
-                        {/* Category selector right beneath the color picker */}
-                        <CategorySelector
-                          categories={categories}
-                          selectedCategory={newTagCategory}
-                          onSelectCategory={(id) => {
-                            setNewTagCategory(id);
-                            setLastSelectedCategory(id);
-                          }}
-                          onAddCategory={handleAddCategory}
-                        />
+                      {/* Row 2: Wrapped row of color swatches */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {aestheticColors.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setTempTagColor(c)}
+                            className={cn(
+                              "w-5 h-5 rounded-full shrink-0 border-2 transition-all",
+                              tempTagColor === c ? "border-brand-navy dark:border-brand-sage scale-110 shadow-sm" : "border-transparent hover:scale-110"
+                            )}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                        <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center hover:scale-110 transition-transform">
+                          <Palette className="w-3 h-3 text-zinc-500 absolute pointer-events-none" />
+                          <input
+                            type="color"
+                            value={tempTagColor || "#000000"}
+                            onChange={(e) => setTempTagColor(e.target.value)}
+                            className="w-8 h-8 absolute -top-1 -left-1 cursor-pointer opacity-0"
+                            title="Custom color"
+                          />
+                        </div>
                       </div>
+
+                      {/* Row 3: Full-width CATEGORY label + clean dropdown select */}
+                      <CategorySelector
+                        categories={categories}
+                        selectedCategory={newTagCategory}
+                        onSelectCategory={(id) => {
+                          setNewTagCategory(id);
+                          setLastSelectedCategory(id);
+                        }}
+                        onAddCategory={handleAddCategory}
+                        size="sm"
+                      />
 
                       </div>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 focus-within:ring-2 ring-brand-navy/20">
+                <div className={cn("flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 focus-within:ring-2 ring-brand-navy/20", isCreatingTag ? "col-span-2" : "col-span-1")}>
                   <CalendarIcon className="w-4 h-4 text-zinc-400 shrink-0" />
                   <input type="date" value={newTaskDate || ""} onChange={e => setNewTaskDate(e.target.value)} className="bg-transparent border-none text-sm outline-none w-full text-zinc-800 dark:text-zinc-200" />
                 </div>
