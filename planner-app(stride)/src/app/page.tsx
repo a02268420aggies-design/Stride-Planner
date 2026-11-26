@@ -1,20 +1,41 @@
 "use client";
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { ConcentricRings } from "@/components/ConcentricRings";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
-import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical, Folder, Settings2, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Star, Library, Plus, ArrowRightToLine, CheckCircle2, X, Trash2, Tag, Clock, Calendar as CalendarIcon, AlignLeft, Utensils, Edit3, Palette, Droplets, Footprints, Search, Inbox, Filter, List, ListOrdered, CheckSquare, Bell, PackageCheck, RotateCcw, Maximize, Target, LineChart, ShoppingCart, ShoppingBag, Sparkles, FolderUp, GripVertical, Folder, Settings2, SlidersHorizontal, Repeat } from "lucide-react";
+import {
+  RecurringTask,
+  RecurrenceFrequency,
+  NormalTaskItem,
+  RECURRING_TASKS_STORAGE_KEY,
+  formatLocalDateKey,
+  parseLocalDateParts,
+  parseLocalDateStr,
+  isRecurringInstance,
+  extractRecurringRuleId,
+  projectTasksForDate,
+  toggleRecurringDateCompletion,
+  deleteRecurringOccurrence,
+  deleteRecurringRule,
+  loadRecurringTasksFromStorage,
+} from "@/lib/recurringTasks";
 
 
 
 type TagItem = { id: string; name: string; color: string; category_id?: string; };
 type CategoryItem = { id: string; name: string; };
-type RecurringTask = { id: string; text?: string; title?: string; name?: string; label?: string; time?: string; tag_id?: string; is_priority: boolean; is_goal: boolean; daysOfWeek: number[]; startDate?: string; endDate?: string; showOnWeek: boolean; showOnMonth: boolean; };
 type MasterTask = { id: string; text?: string; title?: string; name?: string; label?: string; is_priority: boolean; is_goal?: boolean; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; nudgeDate?: string; };
-type TaskItem = { id: string; master_id: string; text?: string; title?: string; name?: string; label?: string; is_done: boolean; is_priority: boolean; is_goal?: boolean; priority_rank?: number; todo_rank?: number; goal_rank?: number; tag_id?: string; due_date?: string; dueDate?: string; time?: string; notes?: string; reminderTime?: string; isReminderActive?: boolean; huddleDismissed?: boolean; nudgeDate?: string; };
+type TaskItem = NormalTaskItem & {
+  isRecurringInstance?: boolean;
+  recurringRuleId?: string;
+  completed?: boolean;
+  isStarred?: boolean;
+  isPriority?: boolean;
+};
 type DeletedTask = MasterTask & { deletedAt: string; };
 
 type MealType = "B" | "L" | "D" | "S";
@@ -33,11 +54,7 @@ type DayTasks = {
 };
 type TaskData = Record<string, DayTasks>;
 
-const getDateKey = (date: Date) => {
-  const d = new Date(date);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().split("T")[0];
-};
+const getDateKey = (date: Date) => formatLocalDateKey(date);
 
 const getEmptyDay = (): DayTasks => ({ items: [], meals: [], water: 0, steps: "", step_goal: "10000", notes: "" });
 
@@ -1179,6 +1196,189 @@ const EditTaskModal = (props: any) => {
   );
 };
 
+const EditRecurringTaskModal = ({
+  rule,
+  tags,
+  onSave,
+  onClose,
+}: {
+  rule: RecurringTask;
+  tags: TagItem[];
+  onSave: (updatedRule: RecurringTask) => void;
+  onClose: () => void;
+}) => {
+  const [text, setText] = useState(rule.text || rule.title || rule.name || rule.label || "");
+  const [tagId, setTagId] = useState(rule.tag_id || "");
+  const [time, setTime] = useState(rule.time || "");
+  const [notes, setNotes] = useState(rule.notes || "");
+  const [isPriority, setIsPriority] = useState(Boolean(rule.isPriority ?? rule.isStarred ?? rule.is_priority));
+  const [isGoal, setIsGoal] = useState(Boolean(rule.is_goal));
+  const [frequency, setFrequency] = useState<RecurrenceFrequency>(rule.frequency || "weekly");
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(Array.isArray(rule.daysOfWeek) ? rule.daysOfWeek : []);
+  const [startDate, setStartDate] = useState(rule.startDate || formatLocalDateKey(new Date()));
+  const [endDate, setEndDate] = useState(rule.endDate || "");
+
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/50">
+          <div className="flex items-center gap-2">
+            <Repeat className="w-4 h-4 text-brand-sage" />
+            <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">Edit Recurring Task</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setIsPriority(p => !p)} className="p-1 hover:scale-110 transition-transform shrink-0" title="Toggle Priority">
+              <Star className={cn("w-5 h-5 transition-colors", isPriority ? "text-brand-sage fill-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
+            </button>
+            <button type="button" onClick={() => setIsGoal(g => !g)} className="p-1 hover:scale-110 transition-transform shrink-0" title="Toggle Goal">
+              <Target className={cn("w-5 h-5 transition-colors", isGoal ? "text-brand-sage" : "text-zinc-300 dark:text-zinc-700")} />
+            </button>
+            <input
+              type="text"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-brand-sage/50 outline-none"
+              autoFocus
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tag</label>
+              <select
+                value={tagId}
+                onChange={e => setTagId(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
+              >
+                <option value="">No Tag</option>
+                {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Time</label>
+              <input
+                type="time"
+                value={time}
+                onChange={e => setTime(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Frequency</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(["daily", "weekly", "biweekly", "monthly"] as const).map(freq => (
+                <button
+                  key={freq}
+                  type="button"
+                  onClick={() => setFrequency(freq)}
+                  className={cn(
+                    "py-1.5 px-2 rounded-lg text-xs font-bold capitalize border transition-all",
+                    frequency === freq
+                      ? "bg-brand-sage text-white border-brand-sage shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-950 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-brand-sage/50"
+                  )}
+                >
+                  {freq}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(frequency === "weekly" || frequency === "biweekly") && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Days of Week</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {["Su", "M", "T", "W", "Th", "F", "S"].map((d, i) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDaysOfWeek(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])}
+                    className={cn(
+                      "w-8 h-8 rounded-full text-xs font-bold transition-all",
+                      daysOfWeek.includes(i)
+                        ? "bg-brand-sage text-white shadow-md"
+                        : "bg-zinc-50 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700"
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">End Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notes</label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Additional notes..."
+              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-3 bg-zinc-50/50 dark:bg-zinc-950/50">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
+          <button
+            onClick={() => {
+              if (!text.trim()) return;
+              onSave({
+                ...rule,
+                text: text.trim(),
+                tag_id: tagId || undefined,
+                time: time || undefined,
+                notes: notes.trim() || undefined,
+                isStarred: isPriority,
+                isPriority,
+                is_priority: isPriority,
+                is_goal: isGoal,
+                frequency,
+                daysOfWeek: frequency === "weekly" || frequency === "biweekly" ? (daysOfWeek.length > 0 ? daysOfWeek : undefined) : undefined,
+                startDate: parseLocalDateParts(startDate) ? startDate : rule.startDate,
+                endDate: parseLocalDateParts(endDate) ? endDate : undefined,
+              });
+            }}
+            className="px-6 py-2 text-sm font-bold bg-brand-navy dark:bg-brand-sage text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+          >
+            Save Rule
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 export default function Home() {
   const [hasMounted, setHasMounted] = useState(false);
@@ -1312,20 +1512,15 @@ export default function Home() {
     setEditingTask(null);
   };
 
-  const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("stride_recurringTasks");
-      if (saved) return JSON.parse(saved);
-    }
-    return [];
-  });
-  const [completedRoutines, setCompletedRoutines] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("stride_completedRoutines");
-      if (saved) return JSON.parse(saved);
-    }
-    return {};
-  });
+  const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>(() =>
+    loadRecurringTasksFromStorage(formatLocalDateKey(new Date()))
+  );
+  const [recurringDeletePrompt, setRecurringDeletePrompt] = useState<{
+    ruleId: string;
+    dateStr: string;
+    taskText: string;
+  } | null>(null);
+  const [editingRecurringTask, setEditingRecurringTask] = useState<RecurringTask | null>(null);
   // Recurring Dispatch Engine State
   const [recurringModalTask, setRecurringModalTask] = useState<any>(null);
   const [recurringDays, setRecurringDays] = useState<number[]>([]); // 0 = Sun, 1 = Mon ...
@@ -1687,10 +1882,11 @@ export default function Home() {
   const [newTaskReminderTime, setNewTaskReminderTime] = useState("");
   const [newTaskReminderActive, setNewTaskReminderActive] = useState(false);
   const [newTaskIsRecurring, setNewTaskIsRecurring] = useState(false);
+  const [newTaskRecurringFrequency, setNewTaskRecurringFrequency] = useState<RecurrenceFrequency>("weekly");
   const [newTaskRecurringDays, setNewTaskRecurringDays] = useState<number[]>([]);
   const [newTaskRecurringEnd, setNewTaskRecurringEnd] = useState("");
-  const [newTaskShowOnWeek, setNewTaskShowOnWeek] = useState(false);
-  const [newTaskShowOnMonth, setNewTaskShowOnMonth] = useState(false);
+  const [newTaskShowOnWeek, setNewTaskShowOnWeek] = useState(true);
+  const [newTaskShowOnMonth, setNewTaskShowOnMonth] = useState(true);
 
   const [waterJustCompleted, setWaterJustCompleted] = useState(false);
   const [archivedFlashId, setArchivedFlashId] = useState<string | null>(null);
@@ -1762,7 +1958,7 @@ export default function Home() {
   }, [deletedTasks]);
 
   useEffect(() => {
-    try { localStorage.setItem('stride_recurringTasks', JSON.stringify(recurringTasks)); } catch {}
+    try { localStorage.setItem(RECURRING_TASKS_STORAGE_KEY, JSON.stringify(recurringTasks)); } catch {}
   }, [recurringTasks]);
 
   const handleDeleteCategory = (catId: string) => {
@@ -1811,9 +2007,39 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    try { localStorage.setItem('stride_completedRoutines', JSON.stringify(completedRoutines)); } catch {}
-  }, [completedRoutines]);
+  const getTasksForDate = useCallback(
+    (dateStr: string): TaskItem[] => {
+      return projectTasksForDate(dateStr, dataStore, recurringTasks) as TaskItem[];
+    },
+    [dataStore, recurringTasks]
+  );
+
+  const toggleRecurringTaskCompletion = useCallback((ruleId: string, targetDateStr: string) => {
+    setRecurringTasks((prev) => {
+      const rule = prev.find((r) => r.id === ruleId);
+      const wasDone = rule?.completedDates?.includes(targetDateStr) ?? false;
+      if (rule && !wasDone) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#4ade80', '#22c55e', '#16a34a'] });
+      }
+      return toggleRecurringDateCompletion(prev, ruleId, targetDateStr);
+    });
+  }, []);
+
+  const handleSaveEditedRecurringTask = (updatedRule: RecurringTask) => {
+    setRecurringTasks((prev) => prev.map((r) => (r.id === updatedRule.id ? updatedRule : r)));
+    setEditingRecurringTask(null);
+  };
+
+  const openTaskEditor = (task: TaskItem) => {
+    const recurRuleId = extractRecurringRuleId(task);
+    if (recurRuleId) {
+      const rule = recurringTasks.find((r) => r.id === recurRuleId);
+      if (rule) setEditingRecurringTask(rule);
+      return;
+    }
+    const m = taskBank.find((t) => t.id === task.master_id);
+    if (m) setEditingTask(m);
+  };
 
   const [weeklyGoals, setWeeklyGoals] = useState<Record<string, [string, string, string]>>(() => {
     try {
@@ -1901,7 +2127,7 @@ export default function Home() {
 
     for (let i = 0; i < activeKeys.length; i++) {
       const dKey = activeKeys[i];
-      const items = dataStore[dKey]?.items || [];
+      const items = getTasksForDate(dKey);
       const total = items.length;
       const completed = items.filter(t => t.is_done).length;
       
@@ -1947,7 +2173,7 @@ export default function Home() {
         }
         for (let i = 0; i < 7; i++) {
             const dKey = prevWeekKeys[i];
-            const items = dataStore[dKey]?.items || [];
+            const items = getTasksForDate(dKey);
             const total = items.length;
             const completed = items.filter(t => t.is_done).length;
             if (total > 0) prevDailyRates.push((completed / total) * 100);
@@ -1981,7 +2207,7 @@ export default function Home() {
       sortedTags,
       totalCompleted
     };
-  }, [showInsights, isSundayResetOpen, insightsViewMode, weekDateKeys, monthDateKeys, dataStore, tags, goalsTagId]);
+  }, [showInsights, isSundayResetOpen, insightsViewMode, weekDateKeys, monthDateKeys, getTasksForDate, tags, goalsTagId]);
 
   // ─── Grocery Interactions ──────────────────────────────────
   const solidifyGhost = (ghostName: string) => {
@@ -2284,25 +2510,20 @@ export default function Home() {
     }
   };
 
-  const toggleDayTaskDone = (id: string) => {
-    if (id.startsWith("recur_")) {
-      setCompletedRoutines(prev => {
-        const isDone = !!prev[id];
-        if (!isDone) {
-          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#4ade80', '#22c55e', '#16a34a'] });
-        }
-        return { ...prev, [id]: !isDone };
-      });
+  const toggleDayTaskDone = (id: string, targetDate: string = dateKey) => {
+    const recurRuleId = extractRecurringRuleId(id);
+    if (recurRuleId) {
+      toggleRecurringTaskCompletion(recurRuleId, targetDate);
       return;
     }
-    const existingDay = getDayData(dateKey);
+    const existingDay = getDayData(targetDate);
     const task = existingDay.items.find(t => t.id === id);
     const willBecomeDone = task ? !task.is_done : false;
 
     setDataStore((prevStore) => {
-      const day = prevStore[dateKey] || getEmptyDay();
+      const day = prevStore[targetDate] || getEmptyDay();
       const newItems = day.items.map(t => t.id === id ? { ...t, is_done: !t.is_done } : t);
-      return { ...prevStore, [dateKey]: { ...day, items: newItems } };
+      return { ...prevStore, [targetDate]: { ...day, items: newItems } };
     });
 
     if (task && willBecomeDone && task.tag_id === goalsTagId) {
@@ -2345,6 +2566,22 @@ export default function Home() {
   };
 
   const toggleDayTaskPriority = (id: string) => {
+    const recurRuleId = extractRecurringRuleId(id);
+    if (recurRuleId) {
+      setRecurringTasks(prev =>
+        prev.map(rule => {
+          if (rule.id !== recurRuleId) return rule;
+          const nextPriority = !(rule.isPriority ?? rule.isStarred ?? rule.is_priority);
+          return {
+            ...rule,
+            isPriority: nextPriority,
+            isStarred: nextPriority,
+            is_priority: nextPriority,
+          };
+        })
+      );
+      return;
+    }
     setDataStore((prevStore) => {
       const existingDay = getDayData(dateKey);
       const newItems = existingDay.items.map(t => t.id === id ? { ...t, is_priority: !t.is_priority } : t);
@@ -2352,7 +2589,17 @@ export default function Home() {
     });
   };
 
-  const removeDayTask = (id: string, masterId: string, targetDate: string = dateKey) => {
+  const removeDayTask = (id: string, masterId: string, targetDate: string = dateKey, taskObj?: TaskItem) => {
+    const recurRuleId = taskObj ? extractRecurringRuleId(taskObj) : extractRecurringRuleId(id);
+    if (recurRuleId) {
+      const rule = recurringTasks.find(r => r.id === recurRuleId);
+      setRecurringDeletePrompt({
+        ruleId: recurRuleId,
+        dateStr: targetDate,
+        taskText: rule?.text || taskObj?.text || taskObj?.title || "Recurring Task",
+      });
+      return;
+    }
     setDataStore((prevStore) => {
       const existingDay = prevStore[targetDate] || getEmptyDay();
       const newItems = existingDay.items.filter(t => t.id !== id);
@@ -2637,11 +2884,30 @@ export default function Home() {
     if (isCreatingTag && newTagName.trim()) finalTagId = handleAddTag() || "";
     const newMasterId = `m_${Date.now()}`;
     if (newTaskIsRecurring) {
+      const resolvedStartDate = parseLocalDateParts(newTaskDate)
+        ? newTaskDate
+        : (parseLocalDateParts(dateKey) ? dateKey : getDateKey(new Date()));
       const newRecurring: RecurringTask = {
-        id: `rt_${Date.now()}`, text: newTaskText.trim(), time: newTaskTime || undefined,
-        tag_id: finalTagId || undefined, is_priority: newTaskPriority, is_goal: newTaskIsGoal,
-        daysOfWeek: newTaskRecurringDays, startDate: newTaskDate || dateKey, endDate: newTaskRecurringEnd || undefined,
-        showOnWeek: newTaskShowOnWeek, showOnMonth: newTaskShowOnMonth
+        id: `rt_${Date.now()}`,
+        text: newTaskText.trim(),
+        tag_id: finalTagId || undefined,
+        time: newTaskTime || undefined,
+        notes: newTaskNotes.trim() || undefined,
+        isStarred: newTaskPriority,
+        isPriority: newTaskPriority,
+        is_priority: newTaskPriority,
+        is_goal: newTaskIsGoal,
+        startDate: resolvedStartDate,
+        frequency: newTaskRecurringFrequency,
+        daysOfWeek:
+          newTaskRecurringFrequency === "weekly" || newTaskRecurringFrequency === "biweekly"
+            ? (newTaskRecurringDays.length > 0 ? newTaskRecurringDays : undefined)
+            : undefined,
+        endDate: parseLocalDateParts(newTaskRecurringEnd) ? newTaskRecurringEnd : undefined,
+        completedDates: [],
+        deletedDates: [],
+        showOnWeek: true,
+        showOnMonth: true,
       };
       setRecurringTasks(prev => [...prev, newRecurring]);
     } else {
@@ -2660,8 +2926,8 @@ export default function Home() {
     setNewTagName(""); setTempTagColor(aestheticColors[0]);
     setNewTagCategory(lastSelectedCategory || "general");
     setIsCreatingTag(false); setIsPaletteOpen(false);
-    setNewTaskIsRecurring(false); setNewTaskRecurringDays([]); setNewTaskRecurringEnd("");
-    setNewTaskShowOnWeek(false); setNewTaskShowOnMonth(false);
+    setNewTaskIsRecurring(false); setNewTaskRecurringFrequency("weekly"); setNewTaskRecurringDays([]); setNewTaskRecurringEnd("");
+    setNewTaskShowOnWeek(true); setNewTaskShowOnMonth(true);
   };
 
   const scheduleTaskToDay = (masterTask: MasterTask, targetDateKey: string) => {
@@ -2906,25 +3172,8 @@ export default function Home() {
   };
 
   const computedDailyItems = useMemo(() => {
-    const items = [...dayData.items].filter((i: any) => i.isGhost !== true);
-    if (dateKey === "BUFFER" || dateKey.startsWith("BUFFER_")) return items;
-    const activeDate = new Date(dateKey + 'T00:00:00');
-    const dow = activeDate.getDay();
-    recurringTasks.forEach(rt => {
-      if (rt.daysOfWeek.includes(dow)) {
-        if (rt.startDate && dateKey < rt.startDate) return;
-        if (rt.endDate && dateKey > rt.endDate) return;
-        if (items.some(i => i.master_id === rt.id)) return;
-        const compositeKey = `recur_${rt.id}_${dateKey}`;
-        items.push({
-          id: compositeKey, master_id: rt.id, text: (rt.title || rt.text || rt.name || rt.label || "Untitled"), is_done: !!completedRoutines[compositeKey],
-          is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
-        });
-      }
-    });
-    console.log("Selected Day:", dateKey, "Filtered Tasks:", items);
-    return items;
-  }, [dayData.items, dateKey, recurringTasks, completedRoutines]);
+    return getTasksForDate(dateKey);
+  }, [getTasksForDate, dateKey]);
 
   const goalsArray = computedDailyItems.filter(t => goalsTagId && t.tag_id === goalsTagId);
   const prioritiesArray = computedDailyItems.filter(t => t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId));
@@ -3261,25 +3510,7 @@ export default function Home() {
   const renderWeekCard = (colKey: string) => {
     const isBuffer = colKey === "BUFFER";
     const isToday = colKey === getDateKey(new Date());
-    const dayData = dataStore[colKey] || getEmptyDay();
-    
-    let items = [...dayData.items].filter((i: any) => i.isGhost !== true);
-    if (colKey !== "BUFFER" && !colKey.startsWith("BUFFER_")) {
-        const activeDate = new Date(colKey + 'T00:00:00');
-        const dow = activeDate.getDay();
-        recurringTasks.forEach(rt => {
-          if (rt.showOnWeek && rt.daysOfWeek.includes(dow)) {
-            if (rt.startDate && dateKey < rt.startDate) return;
-            if (rt.endDate && dateKey > rt.endDate) return;
-            if (items.some(i => i.master_id === rt.id)) return;
-            const compositeKey = `recur_${rt.id}_${colKey}`;
-            items.push({
-              id: compositeKey, master_id: rt.id, text: (rt.title || rt.text || rt.name || rt.label || "Untitled"), is_done: !!completedRoutines[compositeKey],
-              is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
-            } as any);
-          }
-        });
-    }
+    const items = getTasksForDate(colKey);
 
     const tCompleted = items.filter(t => t.is_done && !t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)).length;
     const tTotal = items.filter(t => !t.is_priority && (!goalsTagId || t.tag_id !== goalsTagId)).length;
@@ -3410,11 +3641,16 @@ export default function Home() {
                         {!isBuffer && (
                           <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                             <input type="checkbox" checked={task.is_done} onChange={() => {
-                              setDataStore(prev => {
-                                 const d = prev[colKey] || getEmptyDay();
-                                 const newI = d.items.map(t => t.id === task.id ? {...t, is_done: !t.is_done} : t);
-                                 return {...prev, [colKey]: {...d, items: newI}};
-                              });
+                              const recurRuleId = extractRecurringRuleId(task);
+                              if (recurRuleId) {
+                                toggleRecurringTaskCompletion(recurRuleId, colKey);
+                              } else {
+                                setDataStore(prev => {
+                                   const d = prev[colKey] || getEmptyDay();
+                                   const newI = d.items.map(t => t.id === task.id ? {...t, is_done: !t.is_done} : t);
+                                   return {...prev, [colKey]: {...d, items: newI}};
+                                });
+                              }
                             }} className="peer appearance-none w-4 h-4 border-2 border-brand-navy/30 rounded-sm checked:bg-brand-navy checked:border-brand-navy transition-all cursor-pointer" />
                             <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                           </div>
@@ -3425,6 +3661,7 @@ export default function Home() {
                              {renderTagDot(task.tag_id)}
                              {(task.is_goal || (goalsTagId && task.tag_id === goalsTagId)) && <Target className="w-3.5 h-3.5 text-brand-sage" />}
                              {task.is_priority && <Star className="w-3.5 h-3.5 text-brand-sage fill-brand-sage" />}
+                             {isRecurringInstance(task) && <Repeat className="w-3 h-3 text-brand-sage" title="Recurring task" />}
                            </div>
                            <span className={cn("text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-200 ml-2", task.is_done && "line-through text-zinc-400 dark:text-zinc-500")}>
                              {task.title || task.text || task.name || task.label || "Untitled Task"}
@@ -3446,7 +3683,7 @@ export default function Home() {
                                   return {...prev, "BUFFER": {...sb, items: sb.items.filter(t => t.id !== task.id)}};
                                 });
                               } else {
-                                removeDayTask(task.id, task.master_id, colKey);
+                                removeDayTask(task.id, task.master_id, colKey, task);
                               }
                            }} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 rounded-md transition-colors text-zinc-400"><Trash2 className="w-4 h-4" /></button>
                         </div>
@@ -3798,22 +4035,25 @@ export default function Home() {
               ) : (
                 recurringTasks.map(rt => (
                   <div key={rt.id} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{(rt.title || rt.text || rt.name || rt.label || "Untitled")}</span>
-                        {rt.tag_id && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tagsById[rt.tag_id]?.color }} />}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Repeat className="w-3.5 h-3.5 text-brand-sage shrink-0" />
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate">{(rt.title || rt.text || rt.name || rt.label || "Untitled")}</span>
+                        {rt.tag_id && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tagsById[rt.tag_id]?.color }} />}
                       </div>
-                      <button onClick={() => setRecurringTasks(prev => prev.filter(r => r.id !== rt.id))} className="text-xs font-bold px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">Delete / End Routine</button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => setEditingRecurringTask(rt)} className="text-xs font-bold px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Edit</button>
+                        <button onClick={() => setRecurringTasks(prev => deleteRecurringRule(prev, rt.id))} className="text-xs font-bold px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">Delete / End Routine</button>
+                      </div>
                     </div>
                     <div className="text-xs text-zinc-500 font-semibold flex flex-wrap gap-x-4 gap-y-1">
-                      <span>Days: {rt.daysOfWeek.map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(', ')}</span>
+                      <span className="capitalize">Frequency: {rt.frequency || "weekly"}</span>
+                      {(rt.frequency === "weekly" || rt.frequency === "biweekly") && rt.daysOfWeek && rt.daysOfWeek.length > 0 && (
+                        <span>Days: {rt.daysOfWeek.map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(', ')}</span>
+                      )}
                       {rt.time && <span>Time: {rt.time}</span>}
                       {rt.startDate && <span>Starts: {rt.startDate}</span>}
                       {rt.endDate && <span className="text-amber-600">Ends: {rt.endDate}</span>}
-                    </div>
-                    <div className="text-[10px] uppercase font-bold text-zinc-400 mt-1 flex gap-3">
-                      {rt.showOnWeek && <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">Weekly View</span>}
-                      {rt.showOnMonth && <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">Monthly View</span>}
                     </div>
                   </div>
                 ))
@@ -5052,6 +5292,82 @@ export default function Home() {
         />
       )}
 
+      {/* Edit Recurring Task Modal */}
+      {editingRecurringTask && (
+        <EditRecurringTaskModal
+          rule={editingRecurringTask}
+          tags={tags}
+          onSave={handleSaveEditedRecurringTask}
+          onClose={() => setEditingRecurringTask(null)}
+        />
+      )}
+
+      {/* Recurring Task Delete Confirmation Modal */}
+      {recurringDeletePrompt && (
+        <div
+          className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setRecurringDeletePrompt(null)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/50">
+              <div className="flex items-center gap-2">
+                <Repeat className="w-4 h-4 text-brand-sage" />
+                <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">Delete Recurring Task</h3>
+              </div>
+              <button onClick={() => setRecurringDeletePrompt(null)} className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-3">
+              <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                "{recurringDeletePrompt.taskText}"
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Choose whether to remove only the occurrence on{" "}
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                  {(parseLocalDateStr(recurringDeletePrompt.dateStr) || new Date()).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                </span>{" "}
+                or stop the recurring rule entirely.
+              </p>
+              <div className="flex flex-col gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecurringTasks(prev =>
+                      deleteRecurringOccurrence(prev, recurringDeletePrompt.ruleId, recurringDeletePrompt.dateStr)
+                    );
+                    setRecurringDeletePrompt(null);
+                  }}
+                  className="w-full px-4 py-2.5 text-sm font-bold text-brand-navy dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors text-left"
+                >
+                  Delete this occurrence only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecurringTasks(prev => deleteRecurringRule(prev, recurringDeletePrompt.ruleId));
+                    setRecurringDeletePrompt(null);
+                  }}
+                  className="w-full px-4 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors text-left"
+                >
+                  Delete all future occurrences
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecurringDeletePrompt(null)}
+                  className="w-full px-4 py-2 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Task Modal */}
       {isModalOpen && (
         <>
@@ -5190,32 +5506,59 @@ export default function Home() {
                 {/* Make Recurring Toggle */}
                 <div className="col-span-2 flex flex-col gap-2 mt-2">
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-zinc-600 dark:text-zinc-300">
-                    <input type="checkbox" checked={newTaskIsRecurring} onChange={e => setNewTaskIsRecurring(e.target.checked)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-brand-sage checked:border-brand-sage transition-all" />
+                    <input
+                      type="checkbox"
+                      checked={newTaskIsRecurring}
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        setNewTaskIsRecurring(checked);
+                        if (checked && newTaskRecurringDays.length === 0) {
+                          const targetKey = parseLocalDateParts(newTaskDate) ? newTaskDate : dateKey;
+                          const startDt = parseLocalDateStr(targetKey);
+                          if (startDt) setNewTaskRecurringDays([startDt.getDay()]);
+                        }
+                      }}
+                      className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-brand-sage checked:border-brand-sage transition-all"
+                    />
                     Make Recurring?
                   </label>
                   {newTaskIsRecurring && (
                     <div className="flex flex-col gap-3 p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg animate-in slide-in-from-top-2 duration-200">
                       <div>
-                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Days of the week</span>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {["Su", "M", "T", "W", "Th", "F", "S"].map((d, i) => (
-                            <button type="button" key={d} onClick={() => setNewTaskRecurringDays(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])} className={cn("w-8 h-8 rounded-full text-xs font-bold transition-all", newTaskRecurringDays.includes(i) ? "bg-brand-sage text-white shadow-md" : "bg-white dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700 hover:border-brand-sage/50")}>
-                              {d}
+                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Frequency</span>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {(["daily", "weekly", "biweekly", "monthly"] as const).map(freq => (
+                            <button
+                              type="button"
+                              key={freq}
+                              onClick={() => setNewTaskRecurringFrequency(freq)}
+                              className={cn(
+                                "py-1.5 px-2 rounded-lg text-xs font-bold capitalize border transition-all",
+                                newTaskRecurringFrequency === freq
+                                  ? "bg-brand-sage text-white border-brand-sage shadow-sm"
+                                  : "bg-white dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:border-brand-sage/50"
+                              )}
+                            >
+                              {freq}
                             </button>
                           ))}
                         </div>
                       </div>
+                      {(newTaskRecurringFrequency === "weekly" || newTaskRecurringFrequency === "biweekly") && (
+                        <div>
+                          <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Days of the week</span>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {["Su", "M", "T", "W", "Th", "F", "S"].map((d, i) => (
+                              <button type="button" key={d} onClick={() => setNewTaskRecurringDays(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])} className={cn("w-8 h-8 rounded-full text-xs font-bold transition-all", newTaskRecurringDays.includes(i) ? "bg-brand-sage text-white shadow-md" : "bg-white dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700 hover:border-brand-sage/50")}>
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-col gap-1.5 mt-1">
                         <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">End Date (Optional)</span>
                         <input type="date" value={newTaskRecurringEnd} onChange={e => setNewTaskRecurringEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-sm outline-none" />
-                      </div>
-                      <div className="flex flex-col gap-2 mt-1">
-                        <label className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 cursor-pointer">
-                          <input type="checkbox" checked={newTaskShowOnWeek} onChange={e => setNewTaskShowOnWeek(e.target.checked)} className="appearance-none w-3.5 h-3.5 border-2 border-zinc-300 dark:border-zinc-600 rounded-sm checked:bg-brand-navy checked:border-brand-navy transition-all" /> Add to Weekly View
-                        </label>
-                        <label className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 cursor-pointer">
-                          <input type="checkbox" checked={newTaskShowOnMonth} onChange={e => setNewTaskShowOnMonth(e.target.checked)} className="appearance-none w-3.5 h-3.5 border-2 border-zinc-300 dark:border-zinc-600 rounded-sm checked:bg-brand-navy checked:border-brand-navy transition-all" /> Add to Monthly View
-                        </label>
                       </div>
                     </div>
                   )}
@@ -5506,14 +5849,14 @@ export default function Home() {
         {isTouchDevice && (
           <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[256px]">
 
-                               <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+                               <button onClick={() => openTaskEditor(task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
                                <button onClick={() => toggleDayTaskPriority(task.id)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Make Priority"><Star className="w-5 h-5" /></button>
                                {taskBank.some(t => t.id === task.master_id) ? (
                                  <button onClick={() => smartArchiveFromDay(task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
                                ) : (
                                  <div className="flex-1 border-r border-zinc-200 dark:border-zinc-700/50"></div>
                                )}
-                               <button onClick={() => removeDayTask(task.id, task.master_id)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+                               <button onClick={() => removeDayTask(task.id, task.master_id, dateKey, task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
                             
           </div>
         )}
@@ -5531,7 +5874,10 @@ export default function Home() {
                                 <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                               </div>
                               <div className="flex-1 flex flex-col min-w-0">
-                                <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.title || task.text || task.name || task.label || "Untitled Task"}</span>
+                                <span className={cn("text-foreground text-lg transition-all duration-200 select-none leading-tight mt-0.5 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage flex items-center gap-1.5", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => openTaskEditor(task)}>
+                                  <span className="truncate">{task.title || task.text || task.name || task.label || "Untitled Task"}</span>
+                                  {isRecurringInstance(task) && <Repeat className="w-3.5 h-3.5 text-brand-sage shrink-0" title="Recurring task" />}
+                                </span>
                                 {task.time && (
                                   <span className={cn(
                                     "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
@@ -5561,14 +5907,14 @@ export default function Home() {
 
       {/* Desktop Hover Action Tray */}
                           <div className="hidden lg:flex absolute right-14 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
-                            <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
+                            <button onClick={() => openTaskEditor(task)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                             <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Make Priority"><Star className="w-4 h-4 text-zinc-400 hover:text-brand-sage" /></button>
                             {taskBank.some(t => t.id === task.master_id) && (
                               <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
                                 <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
                               </button>
                             )}
-                            <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                            <button onClick={() => removeDayTask(task.id, task.master_id, dateKey, task)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                           </div>
                         </ReorderableListItem>
                       );
@@ -5670,14 +6016,14 @@ export default function Home() {
         {isTouchDevice && (
           <div className="absolute inset-y-0 right-0 flex items-stretch bg-zinc-50 dark:bg-zinc-800/50 z-0 rounded-r-xl border-l border-zinc-200 dark:border-zinc-700/50 w-[256px]">
 
-                                 <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
+                                 <button onClick={() => openTaskEditor(task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-brand-navy hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Edit Task"><Edit3 className="w-5 h-5" /></button>
                                  <button onClick={() => toggleDayTaskPriority(task.id)} className="flex-1 flex items-center justify-center text-brand-sage hover:bg-brand-sage/10 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Remove Priority"><Star className="w-5 h-5 fill-brand-sage" /></button>
                                  {taskBank.some(t => t.id === task.master_id) ? (
                                    <button onClick={() => smartArchiveFromDay(task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors border-r border-zinc-200 dark:border-zinc-700/50" title="Archive task"><PackageCheck className="w-5 h-5" /></button>
                                  ) : (
                                    <div className="flex-1 border-r border-zinc-200 dark:border-zinc-700/50"></div>
                                  )}
-                                 <button onClick={() => removeDayTask(task.id, task.master_id)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
+                                 <button onClick={() => removeDayTask(task.id, task.master_id, dateKey, task)} className="flex-1 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
                               
           </div>
         )}
@@ -5698,7 +6044,10 @@ export default function Home() {
                                   <span className="font-mono text-lg font-bold text-brand-sage/60 w-6 shrink-0 text-center">{i + 1}</span>
                                 </div>
                                 <div className="flex-1 flex flex-col cursor-pointer overflow-hidden min-w-0">
-                                  <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight truncate cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.title || task.text || task.name || task.label || "Untitled Task"}</span>
+                                  <span className={cn("text-foreground text-lg transition-colors duration-200 select-none leading-tight cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage flex items-center gap-1.5", task.is_done && "line-through text-zinc-400 dark:text-zinc-600")} onClick={() => openTaskEditor(task)}>
+                                    <span className="truncate">{task.title || task.text || task.name || task.label || "Untitled Task"}</span>
+                                    {isRecurringInstance(task) && <Repeat className="w-3.5 h-3.5 text-brand-sage shrink-0" title="Recurring task" />}
+                                  </span>
                                   {task.time && (
                                     <span className={cn(
                                       "flex items-center gap-1 text-[11px] font-medium mt-0.5 font-mono",
@@ -5727,14 +6076,14 @@ export default function Home() {
 
       {/* Desktop Hover Action Tray */}
                             <div className="hidden lg:flex absolute right-14 top-1/2 -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-zinc-950/95 pl-2 shadow-sm rounded-l-md border border-zinc-100 dark:border-zinc-800 p-1 z-10">
-                              <button onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
+                              <button onClick={() => openTaskEditor(task)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Edit Task"><Edit3 className="w-4 h-4 text-zinc-400 hover:text-brand-navy" /></button>
                               <button onClick={() => toggleDayTaskPriority(task.id)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors" title="Remove Priority"><Star className="w-4 h-4 text-brand-sage fill-brand-sage" /></button>
                               {taskBank.some(t => t.id === task.master_id) && (
                                 <button onClick={() => smartArchiveFromDay(task)} className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors" title="Archive task — marks done & removes from Bank">
                                   <PackageCheck className="w-4 h-4 text-zinc-400 hover:text-green-600" />
                                 </button>
                               )}
-                              <button onClick={() => removeDayTask(task.id, task.master_id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                              <button onClick={() => removeDayTask(task.id, task.master_id, dateKey, task)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors shrink-0" title="Delete from day"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                             </div>
                           </ReorderableListItem>
                         );
@@ -5829,8 +6178,11 @@ export default function Home() {
                               <input type="checkbox" checked={task.is_done} onChange={() => toggleDayTaskDone(task.id)} className="peer appearance-none w-4 h-4 border-2 border-zinc-300 dark:border-zinc-700 rounded-sm checked:bg-zinc-400 checked:border-zinc-400 transition-all cursor-pointer" />
                               <svg className="absolute w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <span className={cn("text-base transition-all flex-1 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => { const m = taskBank.find(t => t.id === task.master_id); if(m) setEditingTask(m); }}>{task.title || task.text || task.name || task.label || "Untitled Task"}</span>
-                            <button onClick={() => removeDayTask(task.id, task.master_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-all"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
+                            <span className={cn("text-base transition-all flex-1 cursor-pointer hover:text-brand-navy dark:hover:text-brand-sage flex items-center gap-1.5", task.is_done ? "line-through text-zinc-400" : "text-zinc-700 dark:text-zinc-300")} onClick={() => openTaskEditor(task)}>
+                              <span className="truncate">{task.title || task.text || task.name || task.label || "Untitled Task"}</span>
+                              {isRecurringInstance(task) && <Repeat className="w-3.5 h-3.5 text-brand-sage shrink-0" title="Recurring task" />}
+                            </span>
+                            <button onClick={() => removeDayTask(task.id, task.master_id, dateKey, task)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-all"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-500" /></button>
                           </ReorderableListItem>
                         );
                       } else {
@@ -6074,7 +6426,7 @@ export default function Home() {
                 className="w-full flex-1 flex flex-col gap-6"
               >
                 {(() => {
-                  const allWeeklyTasksCount = weekDateKeys.reduce((acc, date) => acc + getDayData(date).items.length, 0);
+                  const allWeeklyTasksCount = weekDateKeys.reduce((acc, date) => acc + getTasksForDate(date).length, 0);
 
                   return (
                     <>
@@ -6310,22 +6662,7 @@ export default function Home() {
                           const isCurrentMonth = mKey.startsWith(currentMonthKey);
                           const isToday = mKey === getDateKey(new Date());
                           
-                          const storedDay = dataStore[mKey] || { items: [], meals: [], completedSteps: 0, waterOunces: 0, notesText: "" };
-                          let dayItems: TaskItem[] = storedDay.items.filter(i => (i as any).isGhost !== true);
-                          const mActiveDate = new Date(mKey + 'T00:00:00');
-                          const dow = mActiveDate.getDay();
-                          recurringTasks.forEach(rt => {
-                            if (rt.showOnMonth && rt.daysOfWeek.includes(dow)) {
-                              if (rt.startDate && mKey < rt.startDate) return;
-                              if (rt.endDate && mKey > rt.endDate) return;
-                              if (dayItems.some(i => i.master_id === rt.id)) return;
-                              const compositeKey = `recur_${rt.id}_${mKey}`;
-                              dayItems.push({
-                                id: compositeKey, master_id: rt.id, text: (rt.title || rt.text || rt.name || rt.label || "Untitled"), is_done: !!completedRoutines[compositeKey],
-                                is_priority: rt.is_priority, is_goal: rt.is_goal, tag_id: rt.tag_id, time: rt.time
-                              } as any);
-                            }
-                          });
+                          const dayItems = getTasksForDate(mKey);
                           const dayPriorities = dayItems.filter(i => i.is_priority);
                           
                           const totalPri = dayPriorities.length;
@@ -6573,8 +6910,8 @@ export default function Home() {
                
                <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-4 custom-scrollbar">
                   {(() => {
-                    const dStore = dataStore[peekDate] || { items: [] };
-                    const topPri = dStore.items.filter((i: any) => !i.isGhost && i.is_priority);
+                    const peekItems = getTasksForDate(peekDate);
+                    const topPri = peekItems.filter((i: any) => i.is_priority);
                     if (topPri.length === 0) return <p className="text-sm text-zinc-400 italic text-center py-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl m-2">Active priority goals will appear here.</p>;
                     return topPri.map((p: any) => (
                       <div key={p.id} className="flex items-center gap-3 bg-white dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl shadow-sm">
